@@ -4,21 +4,21 @@ const GRAPHQL_URL = 'https://graphql.anilist.co';
 
 // AniList Tags/Genres mapping
 const MOOD_TAGS: Record<Mood, string[]> = {
-    'Chill': ['Slice of Life', 'Comedy', 'Iyashikei'],
-    'Excited': ['Action', 'Adventure', 'Sports'],
-    'Emotional': ['Drama', 'Romance', 'Tragedy'],
-    'Laugh': ['Comedy', 'Parody'],
-    'Scared': ['Horror', 'Psychological', 'Thriller'],
-    'Mind-bending': ['Sci-Fi', 'Mystery', 'Psychological', 'Time Travel']
+  'Chill': ['Slice of Life', 'Comedy', 'Iyashikei'],
+  'Excited': ['Action', 'Adventure', 'Sports'],
+  'Emotional': ['Drama', 'Romance', 'Tragedy'],
+  'Laugh': ['Comedy', 'Parody'],
+  'Scared': ['Horror', 'Psychological', 'Thriller'],
+  'Mind-bending': ['Sci-Fi', 'Mystery', 'Psychological', 'Time Travel']
 };
 
 export async function fetchAniList(mood: Mood): Promise<ContentItem[]> {
-    const tags = MOOD_TAGS[mood];
-    const randomTag = tags[Math.floor(Math.random() * tags.length)]; // Pick one tag to vary results
+  const tags = MOOD_TAGS[mood];
+  const randomTag = tags[Math.floor(Math.random() * tags.length)]; // Pick one tag to vary results
 
-    const query = `
+  const query = `
     query ($tag: String) {
-      Page(page: 1, perPage: 20) {
+      Page(page: 1, perPage: 15) {
         media(tag: $tag, type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
           id
           title {
@@ -35,42 +35,57 @@ export async function fetchAniList(mood: Mood): Promise<ContentItem[]> {
             year
           }
           genres
+          trailer {
+             id
+             site
+          }
+          externalLinks {
+            site
+            url
+            icon
+          }
         }
       }
     }
     `;
 
-    try {
-        const res = await fetch(GRAPHQL_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                query,
-                variables: { tag: randomTag }
-            })
-        });
+  try {
+    const res = await fetch(GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        variables: { tag: randomTag }
+      })
+    });
 
-        const data = await res.json();
-        if (!data.data?.Page?.media) return [];
+    const data = await res.json();
+    if (!data.data?.Page?.media) return [];
 
-        return data.data.Page.media.map((item: any) => ({
-            id: `a-${item.id}`,
-            title: item.title.english || item.title.romaji,
-            type: 'anime',
-            moods: [mood],
-            genres: item.genres,
-            language: 'Japanese', // AniList is predominantly Japanese source
-            rating: (item.averageScore || 0) / 10, // Convert 100 scale to 10
-            year: item.seasonYear || item.startDate.year || 0,
-            image: item.coverImage.extraLarge,
-            description: item.description?.replace(/<[^>]*>?/gm, '') || '', // Strip HTML
-        }));
+    return data.data.Page.media.map((item: any) => ({
+      id: `a-${item.id}`,
+      title: item.title.english || item.title.romaji,
+      type: 'anime',
+      moods: [mood],
+      genres: item.genres,
+      language: 'Japanese', // AniList is predominantly Japanese source
+      rating: (item.averageScore || 0) / 10, // Convert 100 scale to 10
+      year: item.seasonYear || item.startDate.year || 0,
+      image: item.coverImage.extraLarge,
+      description: item.description?.replace(/<[^>]*>?/gm, '') || '', // Strip HTML
+      trailerKey: (item.trailer?.site === 'youtube') ? item.trailer.id : undefined,
+      watchProviders: item.externalLinks?.filter((l: any) => l.site === 'Crunchyroll' || l.site === 'Netflix' || l.site === 'Hulu' || l.site === 'Funimation').slice(0, 3).map((l: any) => ({
+        name: l.site,
+        logo: l.icon || '', // AniList might not provide direct logo URL easily, text fallback or generic icon might be needed, for now using icon field if exists or we can mock
+        link: l.url
+      }))
+    }));
 
-    } catch (error) {
-        console.error("AniList Fetch Error:", error);
-        return [];
-    }
+  } catch (error) {
+    console.error("AniList Fetch Error:", error);
+    return [];
+  }
 }

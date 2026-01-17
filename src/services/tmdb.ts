@@ -57,19 +57,46 @@ export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Lang
 
         if (!data.results) return [];
 
-        return data.results.map((item: any) => ({
-            id: `${type === 'movie' ? 'm' : 's'}-${item.id}`,
-            title: item.title || item.name,
-            type: type === 'movie' ? 'movie' : 'series', // Normalized type
-            moods: [mood], // Tagged with the requested mood
-            genres: item.genre_ids ? item.genre_ids.map((id: number) => GENRE_ID_MAP[id] || 'Unknown') : [],
-            language: language,
-            rating: item.vote_average,
-            year: new Date(item.release_date || item.first_air_date).getFullYear() || 0,
-            image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : '',
-            description: item.overview,
-            trailerUrl: '', // Requires a second call, keeping it simple for now or fetch on detail
-        }));
+        // We need to fetch details for EACH item to get trailers/providers
+        // This is expensive, so we'll limit to top 5-10 or trigger on hover.
+        // For this demo, let's fetch details for the top 10 items in parallel.
+        const topResults = data.results.slice(0, 15);
+
+        const detailedPromises = topResults.map(async (item: any) => {
+            // 1. Fetch Details (Videos + Providers)
+            const detailUrl = `${BASE_URL}/${type}/${item.id}?api_key=${API_KEY}&append_to_response=videos,watch/providers`;
+            const detailRes = await fetch(detailUrl);
+            const detailData = await detailRes.json();
+
+            // Extract Trailer
+            const trailer = detailData.videos?.results?.find(
+                (v: any) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')
+            );
+
+            // Extract US Providers (Flatrate / Stream)
+            const providers = detailData['watch/providers']?.results?.US?.flatrate?.slice(0, 3).map((p: any) => ({
+                name: p.provider_name,
+                logo: `${IMAGE_BASE}${p.logo_path}`,
+                link: detailData['watch/providers']?.results?.US?.link // This is usually a general link
+            })) || [];
+
+            return {
+                id: `${type === 'movie' ? 'm' : 's'}-${item.id}`,
+                title: item.title || item.name,
+                type: type === 'movie' ? 'movie' : 'series',
+                moods: [mood],
+                genres: item.genre_ids ? item.genre_ids.map((id: number) => GENRE_ID_MAP[id] || 'Unknown') : [],
+                language: language,
+                rating: item.vote_average,
+                year: new Date(item.release_date || item.first_air_date).getFullYear() || 0,
+                image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : '',
+                description: item.overview,
+                trailerKey: trailer?.key,
+                watchProviders: providers
+            };
+        });
+
+        return Promise.all(detailedPromises);
 
     } catch (error) {
         console.error("TMDB Fetch Error:", error);

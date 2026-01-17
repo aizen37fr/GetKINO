@@ -133,6 +133,18 @@ export default function CylinderDeck({ items, onClose }: CylinderDeckProps) {
                         const style = getCardStyle(index);
                         const isActive = index === activeIndex;
 
+                        // Auto-play trailer if active for > 1.5s
+                        const [playTrailer, setPlayTrailer] = useState(false);
+                        useEffect(() => {
+                            let timer: any;
+                            if (isActive && item.trailerKey) {
+                                timer = setTimeout(() => setPlayTrailer(true), 1500);
+                            } else {
+                                setPlayTrailer(false);
+                            }
+                            return () => clearTimeout(timer);
+                        }, [isActive, item.trailerKey]);
+
                         return (
                             <div
                                 key={item.id}
@@ -145,14 +157,31 @@ export default function CylinderDeck({ items, onClose }: CylinderDeckProps) {
                                     border: isActive ? '2px solid rgba(255,255,255,0.5)' : 'none'
                                 }}
                             >
-                                <img
-                                    src={item.image}
-                                    className="w-full h-full object-cover pointer-events-none"
-                                    alt={item.title}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
+                                {/* Living Poster: Video Background */}
+                                {playTrailer && isActive ? (
+                                    <div className="absolute inset-0 z-10 bg-black">
+                                        <iframe
+                                            width="100%"
+                                            height="100%"
+                                            src={`https://www.youtube.com/embed/${item.trailerKey}?autoplay=1&controls=0&mute=1&loop=1&playlist=${item.trailerKey}`}
+                                            title="Trailer"
+                                            frameBorder="0"
+                                            allow="autoplay; encrypted-media"
+                                            className="w-full h-full object-cover scale-150 pointer-events-none" // Scale to remove black bars
+                                        ></iframe>
+                                        <div className="absolute inset-0 bg-transparent" /> {/* Overlay to prevent iframe interaction stealing drag */}
+                                    </div>
+                                ) : (
+                                    <img
+                                        src={item.image}
+                                        className="w-full h-full object-cover pointer-events-none"
+                                        alt={item.title}
+                                    />
+                                )}
 
-                                <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90" />
+
+                                <div className="absolute bottom-0 left-0 right-0 p-4 text-white z-20">
                                     <h3 className="font-bold text-xl leading-tight truncate">{item.title}</h3>
                                     <div className="flex items-center gap-2 text-sm mt-1">
                                         <span className="text-yellow-400 font-bold flex items-center gap-1">
@@ -160,6 +189,25 @@ export default function CylinderDeck({ items, onClose }: CylinderDeckProps) {
                                         </span>
                                         <span className="opacity-75">{item.year}</span>
                                     </div>
+
+                                    {/* Watch Providers (Netflix, Prime, etc.) */}
+                                    {item.watchProviders && item.watchProviders.length > 0 && (
+                                        <div className="flex items-center gap-2 mt-3">
+                                            {item.watchProviders.map((provider) => (
+                                                <a
+                                                    key={provider.name}
+                                                    href={provider.link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-8 h-8 rounded-full overflow-hidden border border-white/30 hover:scale-110 transition-transform bg-white/10 flex items-center justify-center p-1"
+                                                    title={`Watch on ${provider.name}`}
+                                                >
+                                                    {/* Fallback to text initials if logo fails/is complex, but real app would use img */}
+                                                    <img src={provider.logo} alt={provider.name} className="w-full h-full object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {/* Action Buttons (Only visible on active or semi-visible) */}
                                     <div className="flex gap-2 mt-3 opacity-0 hover:opacity-100 transition-opacity">

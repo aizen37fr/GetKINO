@@ -13,7 +13,13 @@ export interface ContentItem {
     year: number;
     image: string; // Poster/Backdrop URL
     description: string;
-    trailerUrl?: string;
+    trailerUrl?: string; // Legacy full URL (optional)
+    trailerKey?: string; // YouTube Video ID (e.g., "dQw4w9WgXcQ")
+    watchProviders?: {
+        name: string;
+        logo: string;
+        link: string;
+    }[];
 }
 
 export const db: ContentItem[] = [
