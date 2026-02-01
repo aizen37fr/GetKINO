@@ -76,13 +76,6 @@ export default function SocialView({ onClose }: { onClose: () => void }) {
         setActiveTab('chats');
     };
 
-    const copyId = () => {
-        if (user?.id) {
-            navigator.clipboard.writeText(user.id);
-            alert('ID copied to clipboard!');
-        }
-    };
-
     return (
         <motion.div
             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
