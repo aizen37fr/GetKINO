@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import CylinderDeck from '../components/CylinderDeck';
 import MatchCelebration from '../components/MatchCelebration';
-import { fetchTMDB } from '../services/tmdb';
-import { fetchAniList } from '../services/anilist';
+import { fetchContent } from '../services/api';
 import { matchService } from '../services/match';
 import type { ContentItem } from '../data/db';
 import { Users, ArrowLeft, Copy, Zap } from 'lucide-react';
@@ -26,12 +25,23 @@ export default function MatchMode({ onBack }: MatchModeProps) {
     useEffect(() => {
         const loadContent = async () => {
             setLoading(true);
-            // Fetch a mix for the session
-            const movies = await fetchTMDB('movie', 'Excited', 'English');
-            const anime = await fetchAniList('Excited');
-            const mixed = [...movies, ...anime].sort(() => Math.random() - 0.5);
-            setItems(mixed);
-            setLoading(false);
+            try {
+                // Fetch a mix for the session using the robust fetchContent (handles fallbacks)
+                const movies = await fetchContent('movie', 'Excited', 'English');
+                const anime = await fetchContent('anime', 'Excited', 'Japanese'); // fetchContent handles language mapping if needed
+
+                // Combine and shuffle
+                const mixed = [...movies, ...anime]
+                    .filter(item => item.image) // Ensure images exist
+                    .sort(() => Math.random() - 0.5);
+
+                console.log("Match Mode items loaded:", mixed.length);
+                setItems(mixed);
+            } catch (err) {
+                console.error("Match Mode load error:", err);
+            } finally {
+                setLoading(false);
+            }
         };
         loadContent();
 

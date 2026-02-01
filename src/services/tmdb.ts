@@ -39,7 +39,7 @@ const GENRE_ID_MAP: Record<number, string> = {
     10765: 'Sci-Fi & Fantasy', 10766: 'Soap', 10767: 'Talk', 10768: 'War & Politics'
 };
 
-export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Language): Promise<ContentItem[]> {
+export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Language, providerId?: number): Promise<ContentItem[]> {
     if (!API_KEY) {
         console.error("TMDB API Key missing! Check .env");
         return [];
@@ -49,7 +49,12 @@ export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Lang
     const langCode = LANG_MAP[language];
 
     // Discover endpoint offers rich filtering
-    const url = `${BASE_URL}/discover/${type}?api_key=${API_KEY}&language=en-US&with_original_language=${langCode}&with_genres=${genreIds}&sort_by=popularity.desc&include_adult=false&page=1`;
+    let url = `${BASE_URL}/discover/${type}?api_key=${API_KEY}&language=en-US&with_original_language=${langCode}&with_genres=${genreIds}&sort_by=popularity.desc&include_adult=false&page=1`;
+
+    // Add Streaming Provider Filter (Region: IN for India relevance)
+    if (providerId) {
+        url += `&with_watch_providers=${providerId}&watch_region=IN`;
+    }
 
     try {
         const res = await fetch(url);

@@ -1,17 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ContentItem } from '../data/db';
+import { supabase } from '../services/supabase';
 
 type User = {
-    id: string; // Unique ID (e.g., #1234)
+    id: string;
     name: string;
+    email?: string;
     avatar?: string;
 };
 
 type AuthContextType = {
     user: User | null;
     watchlist: ContentItem[];
-    login: (name: string) => void;
-    logout: () => void;
+    signIn: (email: string, pass: string) => Promise<{ error: any }>;
+    signUp: (email: string, pass: string, name: string) => Promise<{ error: any }>;
+    logout: () => Promise<void>;
     addToWatchlist: (item: ContentItem) => void;
     removeFromWatchlist: (id: string) => void;
 };
@@ -19,32 +22,70 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(() => {
-        const saved = localStorage.getItem('wtw_user');
-        return saved ? JSON.parse(saved) : null;
-    });
-
+    const [user, setUser] = useState<User | null>(null);
     const [watchlist, setWatchlist] = useState<ContentItem[]>(() => {
         const saved = localStorage.getItem('wtw_watchlist');
         return saved ? JSON.parse(saved) : [];
     });
 
+    // Check active session on load
+    useEffect(() => {
+        if (!supabase) {
+            console.warn("Supabase keys missing. Auth disabled.");
+            return;
+        }
+
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                setUser({
+                    id: session.user.id,
+                    email: session.user.email,
+                    name: session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User'
+                });
+            }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setUser({
+                    id: session.user.id,
+                    email: session.user.email,
+                    name: session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User'
+                });
+            } else {
+                setUser(null);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    // Sync Watchlist to LocalStorage (Cloud Sync would go here)
     useEffect(() => {
         localStorage.setItem('wtw_watchlist', JSON.stringify(watchlist));
     }, [watchlist]);
 
-    const login = (name: string) => {
-        // Generate a random 4-digit ID
-        const randomId = '#' + Math.floor(1000 + Math.random() * 9000).toString();
-        const newUser = { name, id: randomId };
-        setUser(newUser);
-        localStorage.setItem('wtw_user', JSON.stringify(newUser));
+    const signIn = async (email: string, pass: string) => {
+        if (!supabase) return { error: { message: "Supabase not configured" } };
+        const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        return { error };
     };
 
-    const logout = () => {
-        setUser(null);
+    const signUp = async (email: string, pass: string, name: string) => {
+        if (!supabase) return { error: { message: "Supabase not configured" } };
+        const { error } = await supabase.auth.signUp({
+            email,
+            password: pass,
+            options: {
+                data: { name }
+            }
+        });
+        return { error };
+    };
+
+    const logout = async () => {
+        if (supabase) await supabase.auth.signOut();
         setWatchlist([]);
-        localStorage.removeItem('wtw_user');
         localStorage.removeItem('wtw_watchlist');
     };
 
@@ -60,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, watchlist, login, logout, addToWatchlist, removeFromWatchlist }}>
+        <AuthContext.Provider value={{ user, watchlist, signIn, signUp, logout, addToWatchlist, removeFromWatchlist }}>
             {children}
         </AuthContext.Provider>
     );

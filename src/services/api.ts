@@ -6,9 +6,10 @@ import type { ContentItem, ContentType, Mood, Language } from '../data/db';
 export async function fetchContent(
     type: ContentType,
     mood: Mood,
-    language: Language
+    language: Language,
+    providerId?: number
 ): Promise<ContentItem[]> {
-    console.log(`Fetching ${type} for mood ${mood} in ${language}...`);
+    console.log(`Fetching ${type} for mood ${mood} in ${language} (Provider: ${providerId})...`);
 
     let items: ContentItem[] = [];
 
@@ -18,7 +19,7 @@ export async function fetchContent(
         } else {
             // Map 'series' to TMDB's 'tv'
             const tmdbType = type === 'series' ? 'tv' : 'movie';
-            items = await fetchTMDB(tmdbType, mood, language);
+            items = await fetchTMDB(tmdbType, mood, language, providerId);
         }
     } catch (error) {
         console.error("API Fetch Failed", error);

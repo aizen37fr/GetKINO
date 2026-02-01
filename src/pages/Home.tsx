@@ -9,6 +9,7 @@ import { Film, Tv, Zap, Globe, MessageCircle } from 'lucide-react';
 import CylinderDeck from '../components/CylinderDeck';
 import Background from '../components/Background';
 import StreamRoom from './StreamRoom';
+import GlobalChat from '../components/GlobalChat';
 import { mapVibeToQuery } from '../utils/vibeMapper';
 import { Search, Sparkles, MonitorPlay, Mic } from 'lucide-react'; // Added Mic icon
 
@@ -21,6 +22,14 @@ const MOODS: { label: Mood; color: string; icon: string }[] = [
     { label: 'Mind-bending', color: 'bg-indigo-600', icon: '🧠' },
 ];
 
+const LANGUAGES: Language[] = ['English', 'Hindi', 'Japanese', 'Korean', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Portuguese', 'Russian', 'Arabic'];
+
+const PROVIDERS = [
+    { id: 8, name: 'Netflix', color: 'text-red-500', border: 'border-red-500/50' },
+    { id: 119, name: 'Prime', color: 'text-blue-400', border: 'border-blue-400/50' },
+    { id: 337, name: 'Disney+', color: 'text-indigo-400', border: 'border-indigo-400/50' },
+];
+
 import SocialView from '../components/SocialView';
 
 import { Users } from 'lucide-react';
@@ -29,6 +38,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
     const { user } = useAuth();
     const [selectedType, setSelectedType] = useState<ContentType>('movie');
     const [selectedLang, setSelectedLang] = useState<Language>('English');
+    const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
     const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
     const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
@@ -41,7 +51,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
 
         const loadData = async () => {
             setLoading(true);
-            const data = await fetchContent(selectedType, selectedMood, selectedLang);
+            const data = await fetchContent(selectedType, selectedMood, selectedLang, selectedProvider || undefined);
 
             // Client-side filtering for Genre if needed (APIs did loose genre match)
             const filtered = selectedGenre
@@ -53,7 +63,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
         };
 
         loadData();
-    }, [selectedMood, selectedType, selectedLang, selectedGenre]);
+    }, [selectedMood, selectedType, selectedLang, selectedGenre, selectedProvider]);
 
     const finalItems = items;
     // Fallback logic is now handled in api.ts
@@ -62,6 +72,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
     const [showWatchlist, setShowWatchlist] = useState(false);
     const [showSocial, setShowSocial] = useState(false);
     const [showStreamRoom, setShowStreamRoom] = useState(false);
+    const [showGlobalChat, setShowGlobalChat] = useState(false);
     const { watchlist, removeFromWatchlist } = useAuth(); // Get watchlist data
 
     // Voice & Search State
@@ -134,8 +145,13 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
                         </button>
                         <div className="flex flex-col items-center">
                             <h2 className="text-xl font-bold bg-white/10 px-4 py-1 rounded-full backdrop-blur-md">
-                                {selectedMood} • {selectedType}
+                                {selectedMood} • {selectedType === 'anime' ? 'Anime' : selectedType === 'movie' ? 'Movies' : 'TV'}
                             </h2>
+                            {selectedProvider && (
+                                <span className="text-xs text-gray-400 mt-1">
+                                    on {PROVIDERS.find(p => p.id === selectedProvider)?.name}
+                                </span>
+                            )}
                         </div>
                         <div className="w-20" /> {/* Spacer */}
                     </div>
@@ -154,6 +170,9 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
             </div>
         );
     }
+
+    // ... rest of Home return ...
+
 
     // ... (rest of search logic)
 
@@ -209,6 +228,14 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
                                 </span>
                             )}
                         </button>
+                        {/* Global Chat Button */}
+                        <button
+                            onClick={() => setShowGlobalChat(true)}
+                            className="p-2 md:p-3 bg-green-500/20 border border-green-500/50 rounded-full hover:bg-green-500 hover:text-white transition-all text-green-400 flex items-center gap-2"
+                            title="Global Chat"
+                        >
+                            <Globe size={18} className="md:w-5 md:h-5" />
+                        </button>
                     </div>
                 </div>
 
@@ -248,6 +275,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
             <AnimatePresence>
                 {showSocial && <SocialView onClose={() => setShowSocial(false)} />}
                 {showStreamRoom && <StreamRoom onBack={() => setShowStreamRoom(false)} />}
+                <GlobalChat isOpen={showGlobalChat} onClose={() => setShowGlobalChat(false)} />
             </AnimatePresence>
 
             {/* Watchlist Drawer */}
@@ -348,18 +376,40 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
                         </div>
                     </div>
                     <div className="flex gap-3 flex-wrap max-h-32 overflow-y-auto no-scrollbar mask-gradient-b">
-                        {['English', 'Hindi', 'Japanese', 'Korean', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Portuguese', 'Russian', 'Arabic'].map((lang) => (
-                            <button
-                                key={lang}
-                                onClick={() => setSelectedLang(lang as Language)}
-                                className={`px-4 py-2 rounded-full text-sm border transition-all ${selectedLang === lang
-                                    ? 'bg-white text-black border-white font-bold shadow-lg shadow-white/20'
-                                    : 'bg-transparent border-white/20 text-gray-400 hover:border-white/50 hover:text-white'
-                                    }`}
-                            >
-                                {lang}
-                            </button>
-                        ))}
+                        {/* Language Filter */}
+                        <div className="flex flex-wrap gap-2 justify-center">
+                            {LANGUAGES.slice(0, 10).map((lang) => (
+                                <button
+                                    key={lang}
+                                    onClick={() => setSelectedLang(lang)}
+                                    className={`px-3 py-1 rounded-full text-xs transition-all ${selectedLang === lang
+                                        ? 'bg-white text-black font-bold'
+                                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                        }`}
+                                >
+                                    {lang}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Streaming Services Filter */}
+                        <div className="flex flex-wrap gap-3 justify-center items-center py-2">
+                            <span className="text-xs text-gray-500 font-medium mr-1">Just Watch:</span>
+                            {PROVIDERS.map((provider) => (
+                                <button
+                                    key={provider.id}
+                                    onClick={() => setSelectedProvider(selectedProvider === provider.id ? null : provider.id)}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center gap-2 ${selectedProvider === provider.id
+                                        ? `bg-white/10 ${provider.color} ${provider.border} shadow-[0_0_10px_rgba(255,255,255,0.2)]`
+                                        : 'bg-transparent border-white/10 text-gray-500 hover:text-gray-300 hover:border-white/20'
+                                        }`}
+                                >
+                                    {/* Simple Dot for Icon */}
+                                    <div className={`w-1.5 h-1.5 rounded-full ${selectedProvider === provider.id ? 'bg-current' : 'bg-gray-600'}`} />
+                                    {provider.name}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </section>
 
