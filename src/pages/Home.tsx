@@ -73,7 +73,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
     const [showSocial, setShowSocial] = useState(false);
     const [showStreamRoom, setShowStreamRoom] = useState(false);
     const [showGlobalChat, setShowGlobalChat] = useState(false);
-    const { watchlist, removeFromWatchlist } = useAuth(); // Get watchlist data
+    const { watchlist, removeFromWatchlist, logout } = useAuth(); // Get watchlist data
 
     // Voice & Search State
     const [searchQuery, setSearchQuery] = useState('');
@@ -183,9 +183,19 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
             {/* Header */}
             <header className="p-4 md:p-6 flex flex-col gap-4 relative z-10 sticky top-0 bg-background/80 backdrop-blur-md">
                 <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-bold">Hi, {user?.name} 👋</h1>
-                        <p className="text-gray-400 text-xs md:text-sm">What's the vibe tonight?</p>
+                    <div className="flex items-center gap-2">
+                        <div className="flex flex-col">
+                            <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+                                Hi, {user?.name} 👋
+                            </h1>
+                            <p className="text-gray-400 text-xs md:text-sm">What's the vibe tonight?</p>
+                        </div>
+                        <button
+                            onClick={logout}
+                            className="text-xs text-red-400 hover:text-red-300 border border-red-500/30 px-2 py-1 rounded-md ml-2 transition-colors"
+                        >
+                            Log Out
+                        </button>
                     </div>
 
                     <div className="flex gap-2 md:gap-3">
