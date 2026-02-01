@@ -6,9 +6,9 @@ import Background from '../components/Background';
 
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
+    const [name, setName] = useState(''); // Display Name
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { signIn, signUp } = useAuth();
@@ -17,7 +17,7 @@ export default function AuthPage() {
         e.preventDefault();
         setError(null);
 
-        if (!email || !password || (!isLogin && !name)) {
+        if (!username || !password || (!isLogin && !name)) {
             setError("Please fill in all fields.");
             return;
         }
@@ -26,17 +26,21 @@ export default function AuthPage() {
         try {
             let res;
             if (isLogin) {
-                res = await signIn(email, password);
+                res = await signIn(username, password);
             } else {
-                res = await signUp(email, password, name);
+                res = await signUp(username, password, name);
             }
 
             if (res.error) {
-                setError(res.error.message);
+                if (res.error.message.includes("invalid login value")) {
+                    setError("Invalid username or password.");
+                } else {
+                    setError(res.error.message);
+                }
             } else {
                 // Success! (User state updates via onAuthStateChange)
                 if (!isLogin) {
-                    setError("Account created! Verify your email or try logging in.");
+                    setError("Account created! Verify your email (if required) or try logging in.");
                 }
             }
         } catch (err) {
@@ -87,24 +91,24 @@ export default function AuthPage() {
 
                         {!isLogin && (
                             <div>
-                                <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1 font-semibold">Name</label>
+                                <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1 font-semibold">Display Name</label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    placeholder="Your Name"
+                                    placeholder="e.g. MovieBuff99"
                                     className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 transition-all"
                                 />
                             </div>
                         )}
 
                         <div>
-                            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1 font-semibold">Email</label>
+                            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1 font-semibold">Username</label>
                             <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="name@example.com"
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="Choose a unique username"
                                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 transition-all"
                             />
                         </div>

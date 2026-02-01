@@ -12,8 +12,8 @@ type User = {
 type AuthContextType = {
     user: User | null;
     watchlist: ContentItem[];
-    signIn: (email: string, pass: string) => Promise<{ error: any }>;
-    signUp: (email: string, pass: string, name: string) => Promise<{ error: any }>;
+    signIn: (username: string, pass: string) => Promise<{ error: any }>;
+    signUp: (username: string, pass: string, name: string) => Promise<{ error: any }>;
     logout: () => Promise<void>;
     addToWatchlist: (item: ContentItem) => void;
     removeFromWatchlist: (id: string) => void;
@@ -65,19 +65,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('wtw_watchlist', JSON.stringify(watchlist));
     }, [watchlist]);
 
-    const signIn = async (email: string, pass: string) => {
+    const signIn = async (username: string, pass: string) => {
         if (!supabase) return { error: { message: "Supabase not configured" } };
+        // Create a fake email for the username
+        const email = `${username.toLowerCase().replace(/\s+/g, '')}@wtw.app`;
         const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
         return { error };
     };
 
-    const signUp = async (email: string, pass: string, name: string) => {
+    const signUp = async (username: string, pass: string, name: string) => {
         if (!supabase) return { error: { message: "Supabase not configured" } };
+        // Create a fake email for the username
+        const email = `${username.toLowerCase().replace(/\s+/g, '')}@wtw.app`;
         const { error } = await supabase.auth.signUp({
             email,
             password: pass,
             options: {
-                data: { name }
+                data: { name } // Display name
             }
         });
         return { error };
