@@ -109,7 +109,18 @@ class MatchService {
                 // Workaround: We find the item in our 'likes' history? No, that's just a set of IDs.
                 // Better: The UI should handle the lookup?
                 // Or: We just pass a partial object.
-                this.triggerMatch({ id: action.itemId, title: "Matched Movie", poster: "", backdrop: "", overview: "", type: "movie", language: "en", voteAverage: 0, releaseDate: "" });
+                this.triggerMatch({
+                    id: action.itemId,
+                    title: "Matched Movie",
+                    type: "movie",
+                    moods: [],
+                    genres: [],
+                    language: "English",
+                    rating: 0,
+                    year: 2024,
+                    image: "",
+                    description: "Matched content"
+                });
             }
         }
     }
