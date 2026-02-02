@@ -10,22 +10,53 @@ interface StreamRoomProps {
     onBack: () => void;
 }
 
-// Helper to convert YouTube URLs to embed format
-function convertYouTubeUrl(url: string): string {
-    // Match various YouTube URL formats
-    const patterns = [
+// Helper to convert various platform URLs to embed format
+function convertToEmbedUrl(url: string): string {
+    const trimmedUrl = url.trim();
+
+    // YouTube (regular videos and shorts)
+    const youtubePatterns = [
         /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
         /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/
     ];
 
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
+    for (const pattern of youtubePatterns) {
+        const match = trimmedUrl.match(pattern);
         if (match && match[1]) {
             return `https://www.youtube.com/embed/${match[1]}`;
         }
     }
 
-    return url; // Return original if not a YouTube URL
+    // Twitch (videos and clips)
+    const twitchVideoMatch = trimmedUrl.match(/twitch\.tv\/videos\/(\d+)/);
+    if (twitchVideoMatch && twitchVideoMatch[1]) {
+        return `https://player.twitch.tv/?video=${twitchVideoMatch[1]}&parent=${window.location.hostname}`;
+    }
+
+    const twitchClipMatch = trimmedUrl.match(/twitch\.tv\/\w+\/clip\/([a-zA-Z0-9_-]+)/);
+    if (twitchClipMatch && twitchClipMatch[1]) {
+        return `https://clips.twitch.tv/embed?clip=${twitchClipMatch[1]}&parent=${window.location.hostname}`;
+    }
+
+    // Vimeo
+    const vimeoMatch = trimmedUrl.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch && vimeoMatch[1]) {
+        return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    }
+
+    // TikTok
+    const tiktokMatch = trimmedUrl.match(/tiktok\.com\/@[\w.-]+\/video\/(\d+)/);
+    if (tiktokMatch && tiktokMatch[1]) {
+        return `https://www.tiktok.com/embed/v2/${tiktokMatch[1]}`;
+    }
+
+    // Dailymotion
+    const dailymotionMatch = trimmedUrl.match(/dailymotion\.com\/video\/([a-zA-Z0-9]+)/);
+    if (dailymotionMatch && dailymotionMatch[1]) {
+        return `https://www.dailymotion.com/embed/video/${dailymotionMatch[1]}`;
+    }
+
+    return trimmedUrl; // Return original if no conversion needed
 }
 
 export default function StreamRoom({ onBack }: StreamRoomProps) {
@@ -39,13 +70,8 @@ export default function StreamRoom({ onBack }: StreamRoomProps) {
         e.preventDefault();
         if (!url.trim()) return;
 
-        // Convert YouTube URLs to embed format
-        let processedUrl = url.trim();
-
-        // If it's a YouTube URL and we're in video mode, convert it
-        if (mode === 'video' && (url.includes('youtube.com') || url.includes('youtu.be'))) {
-            processedUrl = convertYouTubeUrl(url);
-        }
+        // Convert platform URLs to embed format (YouTube, Twitch, TikTok, etc.)
+        let processedUrl = convertToEmbedUrl(url);
 
         // If in Video Mode, check support
         if (mode === 'video') {
@@ -94,7 +120,7 @@ export default function StreamRoom({ onBack }: StreamRoomProps) {
                             type="text"
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
-                            placeholder={mode === 'video' ? "Paste video link (YouTube, .mp4, Twitch)..." : "Paste website URL to embed..."}
+                            placeholder={mode === 'video' ? "Paste video link (YouTube, Twitch, TikTok, Vimeo)..." : "Paste website URL to embed..."}
                             className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-24 text-white focus:outline-none focus:border-blue-500 transition-colors"
                         />
                         <button
@@ -163,7 +189,7 @@ export default function StreamRoom({ onBack }: StreamRoomProps) {
                         <p>Paste a link above to start.</p>
                         <p className="text-xs mt-2 text-gray-500">
                             {mode === 'video'
-                                ? "Supports YouTube, Vimeo, Twitch, and direct files."
+                                ? "Supports YouTube, Twitch, TikTok, Vimeo, Dailymotion, and direct files."
                                 : "Embeds websites directly. (Note: Some sites block embedding)"}
                         </p>
                     </div>
