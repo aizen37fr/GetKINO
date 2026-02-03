@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, X, MessageCircle, Sparkles, UserPlus } from 'lucide-react';
+import { Heart, X, Sparkles } from 'lucide-react';
 import { MOCK_MATCHES, type MatchProfile } from '../services/matching';
 import { useAuth } from '../context/AuthContext';
 
 export default function TasteMatch() {
     const { user } = useAuth();
-    const [profiles, setProfiles] = useState<MatchProfile[]>(MOCK_MATCHES);
+    const [profiles] = useState<MatchProfile[]>(MOCK_MATCHES);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [lastDirection, setLastDirection] = useState<'left' | 'right' | null>(null);
 

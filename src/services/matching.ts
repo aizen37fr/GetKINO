@@ -1,4 +1,4 @@
-import { UserProfile } from '../types/recommendations';
+import type { UserProfile } from '../types/streamScore';
 
 export interface MatchProfile {
     userId: string;
@@ -19,14 +19,15 @@ export function calculateCompatibility(
 ): MatchProfile {
     let score = 0;
     const sharedGenres: string[] = [];
-    const sharedMovies: string[] = []; // In a real app, we'd need their full watchlist
+    // const sharedMovies: string[] = []; // In a real app, we'd need their full watchlist
 
     // 1. Genre Overlap (40%)
-    const myGenres = myProfile.favoriteGenres.map(g => g.id);
-    const theirGenres = theirProfile.favoriteGenres.map(g => g.id);
+    // const sharedMovies = profileA.watchlist.filter(m => profileB.watchlist.some(w => w.id === m.id));
+    const myGenres = myProfile.favoriteGenres.map((g: { id: number }) => g.id);
+    const theirGenres = theirProfile.favoriteGenres.map((g: { id: number }) => g.id);
 
     // Find intersection
-    const commonGenres = myGenres.filter(g => theirGenres.includes(g));
+    const commonGenres = myGenres.filter((g: number) => theirGenres.includes(g));
     const unionGenres = new Set([...myGenres, ...theirGenres]);
 
     if (unionGenres.size > 0) {

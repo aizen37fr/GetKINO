@@ -27,6 +27,7 @@
 ## Option 2: Netlify
 1.  Drag and drop the `dist/` folder (created after `npm run build`) to [Netlify Drop](https://app.netlify.com/drop).
 2.  Or use CLI: `npx netlify-cli deploy --prod`.
+3.  **Live Site:** [https://getkino.netlify.app](https://getkino.netlify.app)
 
 ## Option 3: GitHub Pages
 1.  Update `vite.config.ts`: Set `base: '/repo-name/'`.

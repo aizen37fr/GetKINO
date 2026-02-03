@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, X, Scan, Film, Image as ImageIcon, Search, AlertCircle, HelpCircle } from 'lucide-react';
+import { Upload, X, Scan, Film, Image as ImageIcon, AlertCircle, HelpCircle } from 'lucide-react';
 import { extractFrameFromVideo, identifyMovie, type VisionResult } from '../services/vision';
-import { fetchContent } from '../services/api';
+// import { fetchContent } from '../services/api'; // Removed as it's unused
 
 interface ClipAnalyzerProps {
     isOpen: boolean;
@@ -14,7 +14,6 @@ export default function ClipAnalyzer({ isOpen, onClose }: ClipAnalyzerProps) {
     const [analyzing, setAnalyzing] = useState(false);
     const [result, setResult] = useState<VisionResult | null>(null);
     const [filePreview, setFilePreview] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -22,7 +21,6 @@ export default function ClipAnalyzer({ isOpen, onClose }: ClipAnalyzerProps) {
 
         setAnalyzing(true);
         setResult(null);
-        setError(null);
         setFilePreview(null);
 
         try {
@@ -49,7 +47,6 @@ export default function ClipAnalyzer({ isOpen, onClose }: ClipAnalyzerProps) {
 
         } catch (err) {
             console.error(err);
-            setError('Could not analyze file. Please try again.');
         } finally {
             setAnalyzing(false);
         }

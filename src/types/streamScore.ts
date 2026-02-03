@@ -22,3 +22,12 @@ export interface StreamScoreStats {
     topVibe: string;
     totalReviews: number;
 }
+
+export interface UserProfile {
+    id: string;
+    name: string;
+    avatar: string;
+    avgRating: number;
+    favoriteGenres: { id: number; name: string }[];
+    watchlist?: any[]; // Simplified for now
+}
