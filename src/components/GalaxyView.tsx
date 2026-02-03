@@ -1,5 +1,4 @@
 import { useRef, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import type { ContentItem } from '../data/db';
 
 interface Star {
@@ -19,12 +18,11 @@ interface GalaxyViewProps {
 
 export default function GalaxyView({ items, onSelect }: GalaxyViewProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [hoveredItem, setHoveredItem] = useState<ContentItem | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
     // Engine State
     const starsRef = useRef<Star[]>([]);
-    const animationFrameRef = useRef<number>();
+    const animationFrameRef = useRef<number | null>(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -95,12 +93,6 @@ export default function GalaxyView({ items, onSelect }: GalaxyViewProps) {
                 ctx.beginPath();
                 ctx.fillStyle = star.color;
 
-                // Glow effect for content stars
-                if (star.item) {
-                    const distCheck = Math.hypot(x2d - mousePos.x - cx, y2d - mousePos.y - cy); // Rough hit test
-                    // Check if mouse is near this star (simple 2D check for now, needs refinement)
-                }
-
                 ctx.arc(x2d, y2d, star.size * scale, 0, Math.PI * 2);
                 ctx.fill();
 
@@ -130,8 +122,21 @@ export default function GalaxyView({ items, onSelect }: GalaxyViewProps) {
         setMousePos({ x, y });
     };
 
+    const handleClick = () => {
+        // Simple click detection (finding closest star)
+        // For MVP, just selects random or first visible for demo effect
+        // Real implementation would raycast
+        if (items.length > 0) {
+            onSelect(items[0]);
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-0 overflow-hidden bg-black" onMouseMove={handleMouseMove}>
+        <div
+            className="fixed inset-0 z-0 overflow-hidden bg-black"
+            onMouseMove={handleMouseMove}
+            onClick={handleClick}
+        >
             <canvas ref={canvasRef} className="w-full h-full" />
 
             {/* Holographic Overlay UI */}
