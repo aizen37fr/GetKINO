@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 // import { db } from '../data/db'; // Removed direct DB access
 import { fetchContent } from '../services/api';
-import type { ContentItem, ContentType, Language, Mood } from '../data/db';
-import { Film, Tv, Zap, Globe, MessageCircle } from 'lucide-react';
+import type { ContentItem, Mood } from '../data/db';
+import { Globe, MessageCircle } from 'lucide-react';
 // import SwipeDeck from '../components/SwipeDeck'; // Replaced by Cylinder
 // import CylinderDeck from '../components/CylinderDeck';
 import Background from '../components/Background';
@@ -13,39 +13,16 @@ import StreamRoom from './StreamRoom';
 import GlobalChat from '../components/GlobalChat';
 import { mapVibeToQuery } from '../utils/vibeMapper';
 import { Sparkles, MonitorPlay, Dna, LogOut, Users } from 'lucide-react'; // Added Dna icon
-import SmartRecommendations from '../components/SmartRecommendations';
 import ClipAnalyzer from '../components/ClipAnalyzer';
 import ReelDNAView from '../components/ReelDNAView';
 import PharmacistHero from '../components/PharmacistHero';
-
-const MOODS: { label: Mood; color: string; icon: string }[] = [
-    { label: 'Chill', color: 'bg-blue-500', icon: '🍃' },
-    { label: 'Excited', color: 'bg-red-500', icon: '🔥' },
-    { label: 'Laugh', color: 'bg-yellow-500', icon: '😂' },
-    { label: 'Emotional', color: 'bg-purple-500', icon: '😭' },
-    { label: 'Scared', color: 'bg-gray-700', icon: '👻' },
-    { label: 'Mind-bending', color: 'bg-indigo-600', icon: '🧠' },
-];
-
-const LANGUAGES: Language[] = ['English', 'Hindi', 'Japanese', 'Korean', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Portuguese', 'Russian', 'Arabic'];
-
-const PROVIDERS = [
-    { id: 8, name: 'Netflix', color: 'text-red-500', border: 'border-red-500/50' },
-    { id: 119, name: 'Prime', color: 'text-blue-400', border: 'border-blue-400/50' },
-    { id: 337, name: 'Disney+', color: 'text-indigo-400', border: 'border-indigo-400/50' },
-];
-
 import SocialView from '../components/SocialView';
-
+import PrescriptionModal from '../components/PrescriptionModal';
 
 export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }) {
     const { } = useAuth();
-    const [selectedType, setSelectedType] = useState<ContentType>('movie');
-    const [selectedLang, setSelectedLang] = useState<Language>('English');
-    const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
-    const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
     const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
-
+    const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null); // For Prescription Modal
     const [items, setItems] = useState<ContentItem[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -55,19 +32,15 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
 
         const loadData = async () => {
             setLoading(true);
-            const data = await fetchContent(selectedType, selectedMood, selectedLang, selectedProvider || undefined);
+            // Defaulting to 'movie', 'English', and no provider/genre filtering for now since legacy UI is gone
+            const data = await fetchContent('movie', selectedMood, 'English', undefined);
 
-            // Client-side filtering for Genre if needed (APIs did loose genre match)
-            const filtered = selectedGenre
-                ? data.filter(i => i.genres.some(g => g.includes(selectedGenre)))
-                : data;
-
-            setItems(filtered);
+            setItems(data);
             setLoading(false);
         };
 
         loadData();
-    }, [selectedMood, selectedType, selectedLang, selectedGenre, selectedProvider]);
+    }, [selectedMood]);
 
     const finalItems = items;
     // Fallback logic is now handled in api.ts
@@ -101,13 +74,8 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
                         </button>
                         <div className="flex flex-col items-center">
                             <h2 className="text-xl font-bold bg-white/10 px-4 py-1 rounded-full backdrop-blur-md">
-                                {selectedMood} • {selectedType === 'anime' ? 'Anime' : selectedType === 'movie' ? 'Movies' : 'TV'}
+                                {selectedMood}
                             </h2>
-                            {selectedProvider && (
-                                <span className="text-xs text-gray-400 mt-1">
-                                    on {PROVIDERS.find(p => p.id === selectedProvider)?.name}
-                                </span>
-                            )}
                         </div>
                         <div className="w-20" /> {/* Spacer */}
                     </div>
@@ -157,8 +125,18 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
                                 </div>
                             </div>
                         ) : (
-                            <GalaxyView items={finalItems} onSelect={(item) => console.log('Selected', item)} />
+                            <GalaxyView items={finalItems} onSelect={(item) => setSelectedItem(item)} />
                         )}
+                        <AnimatePresence>
+                            {selectedItem && (
+                                <PrescriptionModal
+                                    item={selectedItem}
+                                    onClose={() => setSelectedItem(null)}
+                                    diagnosticCode="VIBE-MATCH-01"
+                                    prescriptionType="Recommended Watch"
+                                />
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>
@@ -338,132 +316,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
 
             <div className="relative z-10 p-6 space-y-8 max-w-4xl mx-auto">
 
-                {/* Smart Recommendations Section */}
-                <section>
-                    <SmartRecommendations />
-                </section>
 
-                {/* Content Type Selection */}
-                <section>
-                    <h2 className="text-lg font-semibold mb-4 text-gray-300">I want to watch</h2>
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-                        {[
-                            { id: 'movie', label: 'Movies', icon: Film },
-                            { id: 'series', label: 'TV Shows', icon: Tv },
-                            { id: 'anime', label: 'Anime', icon: Zap },
-                            { id: 'kdrama', label: 'K-Drama', icon: Sparkles },
-                            { id: 'cdrama', label: 'C-Drama', icon: Sparkles },
-                        ].map((item) => (
-                            <button
-                                key={item.id}
-                                onClick={() => setSelectedType(item.id as ContentType)}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-2xl border transition-all whitespace-nowrap ${selectedType === item.id
-                                    ? 'bg-primary border-primary text-white shadow-lg shadow-red-900/20 scale-105'
-                                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                                    }`}
-                            >
-                                <item.icon className="w-5 h-5" />
-                                <span className="font-medium">{item.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
-                {/* Language Selection */}
-                <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-gray-300">Region Unlocked 🌍</h2>
-                        <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 px-3 py-1 rounded-full">
-                            <Globe className="w-3 h-3" />
-                            <span>150+ Countries</span>
-                        </div>
-                    </div>
-                    <div className="flex gap-3 flex-wrap max-h-32 overflow-y-auto no-scrollbar mask-gradient-b">
-                        {/* Language Filter */}
-                        <div className="flex flex-wrap gap-2 justify-center">
-                            {LANGUAGES.slice(0, 10).map((lang) => (
-                                <button
-                                    key={lang}
-                                    onClick={() => setSelectedLang(lang)}
-                                    className={`px-3 py-1 rounded-full text-xs transition-all ${selectedLang === lang
-                                        ? 'bg-white text-black font-bold'
-                                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                                        }`}
-                                >
-                                    {lang}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Streaming Services Filter */}
-                        <div className="flex flex-wrap gap-3 justify-center items-center py-2">
-                            <span className="text-xs text-gray-500 font-medium mr-1">Just Watch:</span>
-                            {PROVIDERS.map((provider) => (
-                                <button
-                                    key={provider.id}
-                                    onClick={() => setSelectedProvider(selectedProvider === provider.id ? null : provider.id)}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center gap-2 ${selectedProvider === provider.id
-                                        ? `bg-white/10 ${provider.color} ${provider.border} shadow-[0_0_10px_rgba(255,255,255,0.2)]`
-                                        : 'bg-transparent border-white/10 text-gray-500 hover:text-gray-300 hover:border-white/20'
-                                        }`}
-                                >
-                                    {/* Simple Dot for Icon */}
-                                    <div className={`w-1.5 h-1.5 rounded-full ${selectedProvider === provider.id ? 'bg-current' : 'bg-gray-600'}`} />
-                                    {provider.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-
-                {/* Genre Selection (New "Clickable Buttons") */}
-                <section>
-                    <h2 className="text-lg font-semibold mb-4 text-gray-300">Filter by Genre</h2>
-                    <div className="flex flex-wrap gap-2">
-                        {['Action', 'Sci-Fi', 'Romance', 'Comedy', 'Thriller', 'Drama', 'Horror', 'Fantasy', 'Adventure', 'Dark Fantasy'].map((genre) => (
-                            <button
-                                key={genre}
-                                onClick={() => setSelectedGenre(selectedGenre === genre ? null : genre)}
-                                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedGenre === genre
-                                    ? 'bg-primary text-white shadow-lg shadow-red-900/40 scale-105'
-                                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                                    }`}
-                            >
-                                {genre}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
-                {/* Mood Grid */}
-                <section>
-                    <h2 className="text-lg font-semibold mb-4 text-gray-300">How are you feeling?</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {MOODS.map((mood, idx) => (
-                            <motion.button
-                                key={mood.label}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: idx * 0.05 }}
-                                whileHover={{ scale: 1.03, rotate: 1 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setSelectedMood(mood.label)}
-                                className={`relative h-28 rounded-2xl p-4 flex flex-col justify-between overflow-hidden group ${mood.color}`}
-                            >
-                                {/* Gradient Overlay */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50" />
-                                <div className="absolute -right-4 -bottom-4 text-6xl opacity-20 group-hover:scale-125 transition-transform duration-500 rotate-12">
-                                    {mood.icon}
-                                </div>
-
-                                <span className="relative z-10 text-2xl">{mood.icon}</span>
-                                <span className="relative z-10 font-bold text-white text-lg tracking-wide shadow-black drop-shadow-md">
-                                    {mood.label}
-                                </span>
-                            </motion.button>
-                        ))}
-                    </div>
-                </section>
             </div>
         </div>
     );
