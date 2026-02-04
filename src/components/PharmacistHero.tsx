@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Zap, HeartPulse, BrainCircuit } from 'lucide-react';
+import { Activity, Zap, HeartPulse, BrainCircuit, Scan } from 'lucide-react';
 
 export default function PharmacistHero({ onPrescribe }: { onPrescribe: (symptom: string) => void }) {
     const [symptom, setSymptom] = useState('');
@@ -131,6 +131,14 @@ export default function PharmacistHero({ onPrescribe }: { onPrescribe: (symptom:
                         <div className="flex gap-4 justify-center md:justify-start text-xs text-gray-500 font-mono">
                             <span className="flex items-center gap-1"><BrainCircuit size={12} /> AI DIAGNOSIS</span>
                             <span className="flex items-center gap-1"><HeartPulse size={12} /> 99% ACCURACY</span>
+                            <button
+                                type="button"
+                                onClick={() => document.dispatchEvent(new CustomEvent('open-detective'))}
+                                className="flex items-center gap-1 hover:text-cyan-400 transition-colors cursor-pointer group ml-4"
+                            >
+                                <Scan size={12} className="group-hover:animate-spin" />
+                                <span className="underline decoration-dashed underline-offset-4 decoration-cyan-500/50">SCAN IMAGE</span>
+                            </button>
                         </div>
                     </div>
 

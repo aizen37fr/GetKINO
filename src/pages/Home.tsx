@@ -13,7 +13,7 @@ import StreamRoom from './StreamRoom';
 import GlobalChat from '../components/GlobalChat';
 import { mapVibeToQuery } from '../utils/vibeMapper';
 import { Sparkles, MonitorPlay, Dna, LogOut, Users } from 'lucide-react'; // Added Dna icon
-import ClipAnalyzer from '../components/ClipAnalyzer';
+import CineDetective from '../components/CineDetective';
 import ReelDNAView from '../components/ReelDNAView';
 import PharmacistHero from '../components/PharmacistHero';
 import SocialView from '../components/SocialView';
@@ -25,6 +25,13 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
     const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null); // For Prescription Modal
     const [items, setItems] = useState<ContentItem[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // Event Listener for CineDetective
+    useEffect(() => {
+        const handleOpenDetective = () => setShowDetective(true);
+        document.addEventListener('open-detective', handleOpenDetective);
+        return () => document.removeEventListener('open-detective', handleOpenDetective);
+    }, []);
 
     // Effect to fetch data when criteria change
     useEffect(() => {
@@ -249,7 +256,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
                 {showStreamRoom && <StreamRoom onBack={() => setShowStreamRoom(false)} />}
                 <GlobalChat isOpen={showGlobalChat} onClose={() => setShowGlobalChat(false)} />
                 <GlobalChat isOpen={showGlobalChat} onClose={() => setShowGlobalChat(false)} />
-                <ClipAnalyzer isOpen={showDetective} onClose={() => setShowDetective(false)} />
+                {showDetective && <CineDetective onClose={() => setShowDetective(false)} />}
                 <ReelDNAView isOpen={showDNA} onClose={() => setShowDNA(false)} />
             </AnimatePresence>
 
