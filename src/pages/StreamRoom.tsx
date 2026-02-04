@@ -70,21 +70,22 @@ export default function StreamRoom({ onBack }: StreamRoomProps) {
         e.preventDefault();
         if (!url.trim()) return;
 
-        // Convert platform URLs to embed format (YouTube, Twitch, TikTok, etc.)
-        let processedUrl = convertToEmbedUrl(url);
-
-        // If in Video Mode, check support
+        // If in Video Mode, use raw URL and let ReactPlayer handle it
         if (mode === 'video') {
-            // Basic validation logic wrapper
+            // Basic validation
             const canPlay = (ReactPlayer as any).canPlay;
-            if (canPlay && !canPlay(processedUrl)) {
+            if (canPlay && !canPlay(url)) {
                 setError("Standard player can't play this. Try switching to 'Web Embed' mode.");
                 return;
             }
+            setPlayingUrl(url); // Use raw URL
+        } else {
+            // Embed Mode: Convert to embeddable format
+            const processedUrl = convertToEmbedUrl(url);
+            setPlayingUrl(processedUrl);
         }
 
         setError('');
-        setPlayingUrl(processedUrl);
     };
 
     return (

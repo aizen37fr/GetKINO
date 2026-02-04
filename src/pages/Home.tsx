@@ -12,10 +12,11 @@ import GalaxyView from '../components/GalaxyView';
 import StreamRoom from './StreamRoom';
 import GlobalChat from '../components/GlobalChat';
 import { mapVibeToQuery } from '../utils/vibeMapper';
-import { Search, Sparkles, MonitorPlay, Mic, Scan, Dna, LogOut, Users } from 'lucide-react'; // Added Dna icon
+import { Sparkles, MonitorPlay, Dna, LogOut, Users } from 'lucide-react'; // Added Dna icon
 import SmartRecommendations from '../components/SmartRecommendations';
 import ClipAnalyzer from '../components/ClipAnalyzer';
 import ReelDNAView from '../components/ReelDNAView';
+import PharmacistHero from '../components/PharmacistHero';
 
 const MOODS: { label: Mood; color: string; icon: string }[] = [
     { label: 'Chill', color: 'bg-blue-500', icon: '🍃' },
@@ -38,7 +39,7 @@ import SocialView from '../components/SocialView';
 
 
 export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }) {
-    const { user } = useAuth();
+    const { } = useAuth();
     const [selectedType, setSelectedType] = useState<ContentType>('movie');
     const [selectedLang, setSelectedLang] = useState<Language>('English');
     const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
@@ -81,58 +82,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
     const [showDNA, setShowDNA] = useState(false);
     const { watchlist, removeFromWatchlist, logout } = useAuth(); // Get watchlist data
 
-    // Voice & Search State
-    const [searchQuery, setSearchQuery] = useState('');
-    const [isListening, setIsListening] = useState(false);
 
-    const handleVoiceSearch = () => {
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            alert("Voice search is not supported in this browser. Try Chrome!");
-            return;
-        }
-
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-
-        recognition.continuous = false;
-        recognition.lang = 'en-US';
-        recognition.interimResults = false;
-
-        recognition.onstart = () => setIsListening(true);
-        recognition.onend = () => setIsListening(false);
-        recognition.onerror = () => setIsListening(false);
-
-        recognition.onresult = (event: any) => {
-            const transcript = event.results[0][0].transcript;
-            setSearchQuery(transcript);
-
-            // Auto-trigger search
-            setTimeout(() => {
-                const result = mapVibeToQuery(transcript);
-                if (result) {
-                    setSelectedMood(result.mood);
-                    setSearchQuery('');
-                } else {
-                    // If vague, keep text for manual edit
-                }
-            }, 800);
-        };
-
-        recognition.start();
-    };
-
-    const handleVibeSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!searchQuery.trim()) return;
-
-        const result = mapVibeToQuery(searchQuery);
-        if (result) {
-            setSelectedMood(result.mood);
-            setSearchQuery('');
-        } else {
-            alert("Couldn't quite get that vibe. Try 'sad', 'funny', 'action'...");
-        }
-    };
 
     if (selectedMood) {
         return (
@@ -255,50 +205,13 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
                     </div>
                 </div>
 
-                {/* Hero Banner - Social Focus */}
-                <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-purple-900/40 to-blue-900/40 border border-white/10 p-6 mb-8">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 blur-[100px] rounded-full pointer-events-none" />
+                <PharmacistHero onPrescribe={(s) => {
+                    const result = mapVibeToQuery(s);
+                    if (result) setSelectedMood(result.mood);
+                    else alert("Symptom unclear. Try 'sad', 'happy', 'anxious'...");
+                }} />
 
-                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="text-center md:text-left">
-                            <h2 className="text-2xl md:text-4xl font-bold mb-2 text-white">
-                                {user?.name ? `Ready, ${user.name.split(' ')[0]}?` : 'Ready?'} Don't watch alone.
-                            </h2>
-                            <p className="text-gray-300 mb-4 max-w-md">
-                                Invite friends, swipe together, and find the perfect movie match in seconds. No more "I don't know, you pick."
-                            </p>
-                            <div className="flex gap-2 justify-center md:justify-start">
-                                <div className="flex -space-x-3">
-                                    {[1, 2, 3].map(i => (
-                                        <div key={i} className="w-8 h-8 rounded-full bg-gray-700 border-2 border-black flex items-center justify-center text-xs">
-                                            👾
-                                        </div>
-                                    ))}
-                                </div>
-                                <span className="text-xs text-gray-400 flex items-center h-8">+3 friends online</span>
-                            </div>
-                        </div>
-
-                        {/* 3D Floating Element Placeholder */}
-                        <div className="w-32 h-32 md:w-40 md:h-40 relative">
-                            <motion.div
-                                animate={{ y: [0, -10, 0], rotate: [0, 5, 0] }}
-                                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                                className="absolute inset-0 bg-gradient-to-br from-pink-500 to-purple-600 rounded-2xl rotate-6 opacity-80"
-                            />
-                            <motion.div
-                                animate={{ y: [0, -15, 0], rotate: [0, -5, 0] }}
-                                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                                className="absolute inset-0 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl -rotate-3 mix-blend-overlay"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center text-4xl">
-                                🍿
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex gap-2 md:gap-3 overflow-x-auto pb-2">
+                <div className="flex gap-2 md:gap-3 overflow-x-auto pb-2 justify-center">
                     {/* Reel DNA Button */}
                     <button
                         onClick={() => setShowDNA(true)}
@@ -349,45 +262,7 @@ export default function HomePage({ onStartMatch }: { onStartMatch?: () => void }
                 </div>
 
                 {/* Vibe Search Bar */}
-                <form onSubmit={handleVibeSearch} className="relative w-full max-w-lg mx-auto mb-6 px-4">
-                    <div className="absolute inset-y-0 left-7 flex items-center pointer-events-none text-purple-400">
-                        <Sparkles size={18} />
-                    </div>
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder={isListening ? "Listening..." : "Type a vibe... e.g. 'I want to cry'"}
-                        className={`w-full bg-white/5 border ${isListening ? 'border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'border-white/10'} rounded-xl py-3 pl-10 pr-20 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all`}
-                    />
 
-                    {/* Voice Button */}
-                    <button
-                        type="button"
-                        onClick={handleVoiceSearch}
-                        className={`absolute inset-y-1 right-20 p-2 rounded-lg transition-all ${isListening ? 'text-pink-500 animate-pulse-ring' : 'text-gray-400 hover:text-white'}`}
-                        title="Voice Search"
-                    >
-                        <Mic size={18} />
-                    </button>
-
-                    {/* CineDetective Button */}
-                    <button
-                        type="button"
-                        onClick={() => setShowDetective(true)}
-                        className="absolute inset-y-1 right-11 p-2 rounded-lg text-gray-400 hover:text-purple-400 transition-colors"
-                        title="Identify Movie (CineDetective)"
-                    >
-                        <Scan size={18} />
-                    </button>
-
-                    <button
-                        type="submit"
-                        className="absolute inset-y-1 right-2 flex items-center justify-center p-2 text-gray-400 hover:text-white"
-                    >
-                        <Search size={18} />
-                    </button>
-                </form>
             </header>
 
             {/* Views Overlay */}
