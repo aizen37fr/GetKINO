@@ -1,24 +1,16 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Scan, X, Search, Film, AlertCircle } from 'lucide-react';
+import { Upload, Scan, X, Search, Film, AlertCircle, Tv, Clapperboard, Sparkles } from 'lucide-react';
 import { db } from '../data/db';
 import { getRandomAnime } from '../services/anilist';
-import { searchAnimeByFile, getAnimeDetails, formatTimestamp } from '../services/tracemoe';
+import { detectContent, type UniversalDetectionResult } from '../services/universalDetection';
 
-interface ScanResult {
-    id: string | number;
-    title: string;
-    similarity: number;
-    episode?: number | string;
-    timestamp: string;
-    image: string;
-    video?: string;
-}
+
 
 export default function CineDetective({ onClose }: { onClose: () => void }) {
     const [image, setImage] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(false);
-    const [result, setResult] = useState<ScanResult | null>(null);
+    const [result, setResult] = useState<UniversalDetectionResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
