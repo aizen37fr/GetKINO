@@ -1,10 +1,9 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Scan, X, Search, Film, AlertCircle, Tv, Clapperboard, Sparkles } from 'lucide-react';
+import { Upload, Scan, X, Search, AlertCircle } from 'lucide-react';
 import { db } from '../data/db';
 import { getRandomAnime } from '../services/anilist';
 import { detectContent, type UniversalDetectionResult } from '../services/universalDetection';
-
 
 
 export default function CineDetective({ onClose }: { onClose: () => void }) {
@@ -17,12 +16,6 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Check if it's an image
-            if (!file.type.startsWith('image/')) {
-                setError('Please upload an image file (JPG, PNG, etc.)');
-                return;
-            }
-
             const url = URL.createObjectURL(file);
             setImage(url);
             setResult(null);
@@ -37,46 +30,26 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
         setError(null);
 
         try {
-            // REAL AI SCAN using trace.moe API with File object
-            console.log('🔍 Scanning image with trace.moe AI...', file.name);
-            const traceMoeResult = await searchAnimeByFile(file);
+            // UNIVERSAL AI DETECTION - Supports anime, movies, TV shows, K-Dramas, C-Dramas
+            console.log('🔍 Universal scan: Detecting content type...');
+            const detectionResult = await detectContent(file);
 
-            if (traceMoeResult && traceMoeResult.similarity > 0.80) {
-                // High confidence match - use trace.moe result
-                console.log('✅ Found match:', traceMoeResult);
-
-                // Get full anime details from AniList
-                const animeDetails = await getAnimeDetails(traceMoeResult.anilist);
+            if (detectionResult && detectionResult.confidence > 0.70) {
+                // High confidence match
+                console.log('✅ Detected:', detectionResult);
 
                 setTimeout(() => {
                     setIsScanning(false);
-                    setResult({
-                        id: `anilist_${traceMoeResult.anilist}`,
-                        title: animeDetails?.title?.english || animeDetails?.title?.romaji || 'Unknown Anime',
-                        similarity: traceMoeResult.similarity,
-                        episode: traceMoeResult.episode,
-                        timestamp: `${formatTimestamp(traceMoeResult.from)} - ${formatTimestamp(traceMoeResult.to)}`,
-                        image: animeDetails?.coverImage?.large || traceMoeResult.image,
-                        video: traceMoeResult.video
-                    });
+                    setResult(detectionResult);
                 }, 2000); // Simulate scanning delay for UX
-            } else if (traceMoeResult) {
+            } else if (detectionResult) {
                 // Low confidence - show warning but still display result
-                console.log('⚠️ Low confidence match:', traceMoeResult);
-                const animeDetails = await getAnimeDetails(traceMoeResult.anilist);
+                console.log('⚠️ Low confidence match:', detectionResult);
 
                 setTimeout(() => {
                     setIsScanning(false);
                     setError('Low confidence match. Result may be inaccurate.');
-                    setResult({
-                        id: `anilist_${traceMoeResult.anilist}`,
-                        title: animeDetails?.title?.english || animeDetails?.title?.romaji || 'Unknown Anime',
-                        similarity: traceMoeResult.similarity,
-                        episode: traceMoeResult.episode,
-                        timestamp: `${formatTimestamp(traceMoeResult.from)} - ${formatTimestamp(traceMoeResult.to)}`,
-                        image: animeDetails?.coverImage?.large || traceMoeResult.image,
-                        video: traceMoeResult.video
-                    });
+                    setResult(detectionResult);
                 }, 2000);
             } else {
                 // No match found - fallback to random
@@ -84,32 +57,33 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
                 throw new Error('No match found');
             }
         } catch (error) {
-            console.error('trace.moe scan error:', error);
+            console.error('Universal detection error:', error);
 
             // Fallback: Try random anime from AniList
             try {
                 const anime = await getRandomAnime();
                 setTimeout(() => {
                     setIsScanning(false);
-                    setError('Could not identify anime. Showing random suggestion instead.');
+                    setError('Could not identify content. Showing random suggestion instead.');
 
                     if (anime) {
                         setResult({
-                            id: anime.id,
+                            type: 'anime',
                             title: anime.title,
-                            similarity: 0.50, // Low confidence indicator
-                            timestamp: `${Math.floor(Math.random() * 2)}:${String(Math.floor(Math.random() * 59)).padStart(2, '0')}:${String(Math.floor(Math.random() * 59)).padStart(2, '0')}`,
-                            image: anime.image
+                            confidence: 0.50,
+                            timestamp: `${Math.floor(Math.random() * 2)}:${String(Math.floor(Math.random() * 59)).padStart(2, '0')}`,
+                            image: anime.image,
+                            source: 'fallback'
                         });
                     } else {
                         // Final fallback to local db
                         const randomItem = db[Math.floor(Math.random() * db.length)];
                         setResult({
-                            id: randomItem.id,
+                            type: 'unknown',
                             title: randomItem.title,
-                            similarity: 0.40,
-                            timestamp: `${Math.floor(Math.random() * 2)}:${String(Math.floor(Math.random() * 59)).padStart(2, '0')}:${String(Math.floor(Math.random() * 59)).padStart(2, '0')}`,
-                            image: randomItem.image
+                            confidence: 0.40,
+                            image: randomItem.image,
+                            source: 'fallback'
                         });
                     }
                 }, 2000);
@@ -125,19 +99,18 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ type: 'spring', duration: 0.5 }}
-                className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-cyan-900/30 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
+                className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border-2 border-cyan-900/30 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl shadow-cyan-900/50"
             >
                 {/* Header */}
-                <div className="bg-gradient-to-r from-cyan-950/50 to-blue-950/50 p-4 flex items-center justify-between border-b border-cyan-900/30">
+                <div className="flex items-center justify-between p-4 border-b border-cyan-900/30 bg-gradient-to-r from-cyan-950/50 to-blue-950/50">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-cyan-900/30 rounded-lg">
                             <Scan className="w-6 h-6 text-cyan-400" />
@@ -166,7 +139,7 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
                             onClick={() => fileInputRef.current?.click()}
                         >
                             <Upload className="w-16 h-16 mx-auto mb-4 text-cyan-600" />
-                            <p className="text-cyan-300 font-semibold mb-2">Upload Anime Screenshot</p>
+                            <p className="text-cyan-300 font-semibold mb-2">Upload Screenshot</p>
                             <p className="text-xs text-cyan-700 uppercase tracking-wider">JPEG, PNG • MAX 5MB</p>
                             <input
                                 ref={fileInputRef}
@@ -191,35 +164,37 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
                                         setResult(null);
                                         setError(null);
                                     }}
-                                    className="absolute top-2 right-2 p-2 bg-red-900/80 hover:bg-red-900 rounded-lg transition-colors"
+                                    className="absolute top-2 right-2 p-1 bg-red-900/80 hover:bg-red-800 rounded-lg transition-colors"
                                 >
-                                    <X size={18} className="text-white" />
+                                    <X size={16} />
                                 </button>
                             </div>
 
                             {/* Results Area */}
-                            <div className="flex flex-col justify-center">
+                            <div className="flex flex-col">
                                 <AnimatePresence mode="wait">
-                                    {isScanning ? (
+                                    {isScanning && (
                                         <motion.div
                                             key="scanning"
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             exit={{ opacity: 0 }}
-                                            className="text-center py-12"
+                                            className="flex flex-col items-center justify-center h-full space-y-6"
                                         >
-                                            <div className="relative w-24 h-24 mx-auto mb-6">
-                                                <motion.div
-                                                    animate={{ rotate: 360 }}
-                                                    transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                                                    className="absolute inset-0 border-4 border-cyan-900/30 border-t-cyan-500 rounded-full"
-                                                />
-                                                <Film className="absolute inset-0 m-auto w-10 h-10 text-cyan-400" />
+                                            <motion.div
+                                                animate={{ rotate: 360 }}
+                                                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                            >
+                                                <Scan className="w-16 h-16 text-cyan-400" />
+                                            </motion.div>
+                                            <div className="text-center">
+                                                <p className="text-cyan-300 font-semibold mb-2">SCANNING...</p>
+                                                <p className="text-xs text-cyan-600 uppercase tracking-wider">ANALYZING SCENE</p>
                                             </div>
-                                            <p className="text-cyan-300 font-semibold mb-2 animate-pulse">ANALYZING SCENE...</p>
-                                            <p className="text-xs text-cyan-700 uppercase tracking-wider">Scanning 20,000+ anime database</p>
                                         </motion.div>
-                                    ) : result ? (
+                                    )}
+
+                                    {!isScanning && result && (
                                         <motion.div
                                             key="result"
                                             initial={{ opacity: 0, x: 20 }}
@@ -228,9 +203,9 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
                                             className="space-y-4"
                                         >
                                             <div className="flex items-center gap-3 mb-4">
-                                                <div className={`w-2 h-2 rounded-full ${result.similarity > 0.85 ? 'bg-green-400' : result.similarity > 0.70 ? 'bg-yellow-400' : 'bg-red-400'} animate-pulse`} />
+                                                <div className={`w-2 h-2 rounded-full ${result.confidence > 0.85 ? 'bg-green-400' : result.confidence > 0.70 ? 'bg-yellow-400' : 'bg-red-400'} animate-pulse`} />
                                                 <span className="text-xs text-cyan-600 uppercase tracking-wider">
-                                                    {result.similarity > 0.85 ? 'High Confidence' : result.similarity > 0.70 ? 'Medium Confidence' : 'Low Confidence'}
+                                                    {result.confidence > 0.85 ? 'High Confidence' : result.confidence > 0.70 ? 'Medium Confidence' : 'Low Confidence'}
                                                 </span>
                                             </div>
 
@@ -242,7 +217,7 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="bg-cyan-950/30 p-3 rounded-lg border border-cyan-900/30">
                                                     <p className="text-xs text-cyan-600 uppercase tracking-wider mb-1">Match</p>
-                                                    <p className="text-lg font-bold text-cyan-300">{(result.similarity * 100).toFixed(1)}%</p>
+                                                    <p className="text-lg font-bold text-cyan-300">{(result.confidence * 100).toFixed(1)}%</p>
                                                 </div>
                                                 {result.episode && (
                                                     <div className="bg-cyan-950/30 p-3 rounded-lg border border-cyan-900/30">
@@ -250,24 +225,19 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
                                                         <p className="text-lg font-bold text-cyan-300">{result.episode}</p>
                                                     </div>
                                                 )}
+                                                {result.timestamp && (
+                                                    <div className="bg-cyan-950/30 p-3 rounded-lg border border-cyan-900/30">
+                                                        <p className="text-xs text-cyan-600 uppercase tracking-wider mb-1">Timestamp</p>
+                                                        <p className="text-lg font-bold text-cyan-300">{result.timestamp}</p>
+                                                    </div>
+                                                )}
                                             </div>
-
-                                            <div className="bg-cyan-950/30 p-3 rounded-lg border border-cyan-900/30">
-                                                <p className="text-xs text-cyan-600 uppercase tracking-wider mb-1">Timestamp</p>
-                                                <p className="text-sm font-mono text-cyan-300">{result.timestamp}</p>
-                                            </div>
-
-                                            <button
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="w-full py-3 bg-gradient-to-r from-cyan-600 to-cyan-700 text-white font-semibold rounded-lg hover:from-cyan-500 hover:to-cyan-600 transition-all shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2"
-                                            >
-                                                <Search size={18} />
-                                                Scan Another Image
-                                            </button>
                                         </motion.div>
-                                    ) : (
+                                    )}
+
+                                    {!isScanning && !result && (
                                         <motion.div
-                                            key="idle"
+                                            key="ready"
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             className="text-center py-12"
@@ -298,9 +268,9 @@ export default function CineDetective({ onClose }: { onClose: () => void }) {
                 <div className="bg-slate-950/50 p-4 border-t border-cyan-900/30 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 text-cyan-700 uppercase tracking-wider">
                         <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                        <span>STATUS: {"GLOBAL"} • {"20,000+"} SCENES</span>
+                        <span>STATUS: {"GLOBAL"} • {"820,000+"} TITLES</span>
                     </div>
-                    <p className="text-cyan-800 uppercase tracking-wider">Powered by trace.moe AI</p>
+                    <p className="text-cyan-800 uppercase tracking-wider">Powered by AI Detection</p>
                 </div>
             </motion.div>
         </motion.div>

@@ -113,3 +113,39 @@ export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Lang
         return [];
     }
 }
+
+/**
+ * Search movies by title
+ */
+export async function searchMoviesByTitle(title: string) {
+    if (!API_KEY) return [];
+
+    const url = `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(title)}&include_adult=false`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.results || [];
+    } catch (error) {
+        console.error('TMDB movie search error:', error);
+        return [];
+    }
+}
+
+/**
+ * Search TV shows by title
+ */
+export async function searchTVByTitle(title: string) {
+    if (!API_KEY) return [];
+
+    const url = `${BASE_URL}/search/tv?api_key=${API_KEY}&query=${encodeURIComponent(title)}&include_adult=false`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.results || [];
+    } catch (error) {
+        console.error('TMDB TV search error:', error);
+        return [];
+    }
+}
