@@ -35,11 +35,25 @@ export interface UniversalDetectionResult {
  * Main universal detection function
  * Tries multiple detection methods in parallel for speed
  */
-export async function detectContent(imageFile: File): Promise<UniversalDetectionResult | null> {
-    console.log('🔍 Universal Detection: Starting multi-source scan...');
+export async function detectContent(
+    imageFile: File,
+    contentType: 'all' | 'anime' | 'movie-series' | 'kdrama-cdrama' = 'all'
+): Promise<UniversalDetectionResult | null> {
+    console.log('🔍 Universal Detection: Starting multi-source scan...', { contentType });
 
     try {
-        // Run all detection methods in parallel (including DeepSeek!)
+        // If user selected specific type, prioritize that detection
+        if (contentType === 'anime') {
+            // Only try anime detection
+            const animeResult = await detectAnime(imageFile);
+            if (animeResult) return animeResult;
+        } else if (contentType === 'kdrama-cdrama' || contentType === 'movie-series') {
+            // Skip anime, go directly to TMDB
+            const tmdbResult = await detectFromFilename(imageFile.name);
+            if (tmdbResult) return tmdbResult;
+        }
+
+        // 'all' or fallback - Run all detection methods in parallel (including DeepSeek!)
         const [animeResult, tmdbResult, aiAnalysis] = await Promise.allSettled([
             detectAnime(imageFile),
             detectFromFilename(imageFile.name),

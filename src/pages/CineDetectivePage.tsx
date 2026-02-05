@@ -11,6 +11,7 @@ export default function CineDetectiveHero() {
     const [isScanning, setIsScanning] = useState(false);
     const [result, setResult] = useState<UniversalDetectionResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [contentType, setContentType] = useState<'all' | 'anime' | 'movie-series' | 'kdrama-cdrama'>('all');
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
@@ -40,8 +41,8 @@ export default function CineDetectiveHero() {
         setError(null);
 
         try {
-            console.log('🔍 Universal scan: Detecting content type...');
-            const detectionResult = await detectContent(file);
+            console.log('🔍 Universal scan: Detecting content type...', { contentType });
+            const detectionResult = await detectContent(file, contentType);
 
             if (detectionResult && detectionResult.confidence > 0.70) {
                 console.log('✅ Detected:', detectionResult);
@@ -146,6 +147,67 @@ export default function CineDetectiveHero() {
                             <Sparkles className="w-5 h-5" />
                             <span className="font-semibold">AI-Powered</span>
                         </div>
+                    </div>
+                </motion.div>
+
+                {/* Content Type Filters */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="mb-8"
+                >
+                    <p className="text-center text-cyan-600 text-sm mb-4 uppercase tracking-wider">
+                        Select Content Type
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setContentType('all')}
+                            className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'all'
+                                ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-lg shadow-cyan-500/50'
+                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                }`}
+                        >
+                            🌐 All Content
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setContentType('anime')}
+                            className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'anime'
+                                ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/50'
+                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                }`}
+                        >
+                            🎌 Anime
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setContentType('movie-series')}
+                            className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'movie-series'
+                                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/50'
+                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                }`}
+                        >
+                            🎬 Movies / TV Series
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setContentType('kdrama-cdrama')}
+                            className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'kdrama-cdrama'
+                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/50'
+                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                }`}
+                        >
+                            🇰🇷 K-Drama / C-Drama
+                        </motion.button>
                     </div>
                 </motion.div>
 
