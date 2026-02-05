@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, Scan, Sparkles, Film, Zap, Globe } from 'lucide-react';
 import { detectContent } from '../services/universalDetection';
-import { getRandomAnime } from '../services/anilist';
-import { db } from '../data/db';
 import type { UniversalDetectionResult } from '../services/universalDetection';
 
 export default function CineDetectiveHero() {
@@ -58,42 +56,30 @@ export default function CineDetectiveHero() {
                     setResult(detectionResult);
                 }, 2000);
             } else {
-                console.log('❌ No match found, using fallback...');
-                throw new Error('No match found');
+                // NO MATCH FOUND - show error based on filter
+                console.log('❌ No match found');
+                setTimeout(() => {
+                    setIsScanning(false);
+
+                    // Different error messages based on filter selection
+                    if (contentType === 'anime') {
+                        setError('❌ No anime found. Try a different screenshot with clearer scenes.');
+                    } else if (contentType === 'kdrama-cdrama') {
+                        setError('❌ No K-drama/C-drama found. Try a screenshot with clear text or logos.');
+                    } else if (contentType === 'movie-series') {
+                        setError('❌ No movie/TV show found. Try a screenshot with clearer details.');
+                    } else {
+                        setError('❌ Could not identify content. Try a clearer screenshot.');
+                    }
+
+                    setResult(null); // DON'T show any fallback result
+                }, 2000);
             }
         } catch (error) {
             console.error('Universal detection error:', error);
-
-            try {
-                const anime = await getRandomAnime();
-                setTimeout(() => {
-                    setIsScanning(false);
-                    setError('Could not identify content. Showing random suggestion instead.');
-
-                    if (anime) {
-                        setResult({
-                            type: 'anime',
-                            title: anime.title,
-                            confidence: 0.50,
-                            timestamp: `${Math.floor(Math.random() * 2)}:${String(Math.floor(Math.random() * 59)).padStart(2, '0')}`,
-                            image: anime.image,
-                            source: 'fallback'
-                        });
-                    } else {
-                        const randomItem = db[Math.floor(Math.random() * db.length)];
-                        setResult({
-                            type: 'unknown',
-                            title: randomItem.title,
-                            confidence: 0.40,
-                            image: randomItem.image,
-                            source: 'fallback'
-                        });
-                    }
-                }, 2000);
-            } catch (fallbackError) {
-                setIsScanning(false);
-                setError('Scan failed. Please try again with a clearer image.');
-            }
+            setIsScanning(false);
+            setError('⚠️ Scan failed. Please try again.');
+            setResult(null);
         }
     };
 
@@ -166,8 +152,8 @@ export default function CineDetectiveHero() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setContentType('all')}
                             className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'all'
-                                ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-lg shadow-cyan-500/50'
-                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                    ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-lg shadow-cyan-500/50'
+                                    : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
                                 }`}
                         >
                             🌐 All Content
@@ -178,8 +164,8 @@ export default function CineDetectiveHero() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setContentType('anime')}
                             className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'anime'
-                                ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/50'
-                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                    ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/50'
+                                    : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
                                 }`}
                         >
                             🎌 Anime
@@ -190,8 +176,8 @@ export default function CineDetectiveHero() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setContentType('movie-series')}
                             className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'movie-series'
-                                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/50'
-                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/50'
+                                    : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
                                 }`}
                         >
                             🎬 Movies / TV Series
@@ -202,8 +188,8 @@ export default function CineDetectiveHero() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setContentType('kdrama-cdrama')}
                             className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'kdrama-cdrama'
-                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/50'
-                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/50'
+                                    : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
                                 }`}
                         >
                             🇰🇷 K-Drama / C-Drama
@@ -280,7 +266,7 @@ export default function CineDetectiveHero() {
 
                     {/* Results Area */}
                     <div className="bg-slate-900/50 backdrop-blur-sm border border-cyan-900/30 rounded-3xl p-8">
-                        {!result && !isScanning && (
+                        {!result && !isScanning && !error && (
                             <div className="h-full flex flex-col items-center justify-center text-center text-cyan-700">
                                 <Film className="w-20 h-20 mb-4 opacity-50" />
                                 <p className="text-xl">Upload a screenshot to begin</p>
@@ -298,7 +284,23 @@ export default function CineDetectiveHero() {
                                     <Scan className="w-20 h-20 text-cyan-400" />
                                 </motion.div>
                                 <h3 className="text-2xl font-bold text-cyan-100 mb-2">Scanning...</h3>
-                                <p className="text-cyan-600">Analyzing with AI • Searching 820K+ titles</p>
+                                <p className="text-cyan-600">
+                                    {contentType === 'all' && 'Analyzing with AI • Searching 820K+ titles'}
+                                    {contentType === 'anime' && '🎌 Searching anime database...'}
+                                    {contentType === 'kdrama-cdrama' && '🇰🇷 Searching K-dramas & C-dramas...'}
+                                    {contentType === 'movie-series' && '🎬 Searching movies & TV shows...'}
+                                </p>
+                            </div>
+                        )}
+
+                        {error && !result && !isScanning && (
+                            <div className="h-full flex flex-col items-center justify-center text-center">
+                                <div className="bg-red-900/20 border border-red-700/50 rounded-xl p-6 max-w-md">
+                                    <p className="text-red-400 text-lg mb-2">{error}</p>
+                                    <p className="text-red-600 text-sm">
+                                        Tips: Use screenshots with clear text, logos, or recognizable scenes
+                                    </p>
+                                </div>
                             </div>
                         )}
 
@@ -320,8 +322,8 @@ export default function CineDetectiveHero() {
                                             {result.type}
                                         </span>
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${result.confidence > 0.85 ? 'bg-green-900/30 border border-green-700/50 text-green-400' :
-                                            result.confidence > 0.70 ? 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-400' :
-                                                'bg-red-900/30 border border-red-700/50 text-red-400'
+                                                result.confidence > 0.70 ? 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-400' :
+                                                    'bg-red-900/30 border border-red-700/50 text-red-400'
                                             }`}>
                                             {(result.confidence * 100).toFixed(0)}% Match
                                         </span>
