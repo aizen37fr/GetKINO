@@ -13,8 +13,15 @@ if (!API_KEY) {
 
 const genAI = new GoogleGenerativeAI(API_KEY || '');
 
+export interface MatchCandidate {
+    showName: string;
+    confidence: number;
+    reason: string;
+}
+
 export interface GeminiAnalysis {
-    showName?: string;
+    primaryMatch: MatchCandidate;
+    alternatives: MatchCandidate[];
     actors?: string[];
     setting: string;
     genre: string[];
@@ -23,8 +30,6 @@ export interface GeminiAnalysis {
     productionStyle: string;
     sceneDescription: string;
     visualElements: string[];
-    confidence: number;
-    alternativeMatches?: string[];
 }
 
 /**
@@ -46,35 +51,64 @@ export async function analyzeWithGemini(imageFile: File): Promise<GeminiAnalysis
         // Use Gemini 2.0 Flash for vision (fastest, Pro subscription)
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-        const prompt = `Analyze this screenshot from a TV show or movie. Provide detailed information:
+        const prompt = `Analyze this screenshot from a TV show or movie. Provide detailed information and your TOP 3 MOST LIKELY MATCHES.
 
-1. **Show/Movie Name**: If you can identify it, what is the exact title?
-2. **Actors**: Can you identify any actors or characters? List them.
-3. **Setting**: Where is this scene taking place? (e.g., "Modern Korean office", "Historical palace", "American high school")
-4. **Genre**: What genres does this appear to be? (Romance, Action, Comedy, Drama, etc.)
-5. **Era**: What time period? (Contemporary 2020s, 2010s, Historical, etc.)
-6. **Country**: What country is this production from? (Korea, USA, Japan, China, etc.)
-7. **Production Style**: What type of production? (K-drama, C-drama, American TV, Anime, Netflix series, etc.)
-8. **Scene Description**: Describe what's happening in detail
-9. **Visual Elements**: List key visual elements (costumes, props, setting details)
-10. **Alternative Matches**: If unsure, list 2-3 possible shows this could be from
+IMPORTANT: Always provide 3 possible matches, even if you're very confident about one. This helps users confirm the correct show.
 
-Be specific and detailed. If you're certain about the show name, state it clearly. If unsure, provide your best guesses.
+For your analysis, identify:
+1. **Primary Match** (your most confident guess):
+   - Exact show/movie name
+   - Confidence score (0.0-1.0)
+   - Why you think it's this show
 
-Format your response as JSON:
+2. **Alternative Match #1** (second most likely):
+   - Show/movie name
+   - Confidence score
+   - Reasoning
+
+3. **Alternative Match #2** (third possibility):
+   - Show/movie name
+   - Confidence score
+   - Reasoning
+
+Also analyze:
+- **Actors/Characters**: Any recognizable actors or character types
+- **Setting**: Location, country, era (e.g., "Modern Korean office", "Historical palace")
+- **Genre**: What genres does this appear to be?
+- **Production Style**: K-drama, C-drama, American TV, Anime, etc.
+- **Visual Clues**: Costumes, props, cinematography quality
+- **Scene Context**: What's happening in this scene?
+
+Return ONLY valid JSON in this exact format:
 {
-    "showName": "exact title or null if unknown",
-    "actors": ["actor names if recognizable"],
-    "setting": "description",
-    "genre": ["genre1", "genre2"],
-    "era": "time period",
-    "country": "country",
-    "productionStyle": "style",
-    "sceneDescription": "detailed description",
-    "visualElements": ["element1", "element2"],
-    "confidence": 0.0-1.0,
-    "alternativeMatches": ["show1", "show2", "show3"]
-}`;
+  "primaryMatch": {
+    "showName": "exact title",
+    "confidence": 0.85,
+    "reason": "why you think it's this"
+  },
+  "alternatives": [
+    {
+      "showName": "alternative 1",
+      "confidence": 0.65,
+      "reason": "why it could be this"
+    },
+    {
+      "showName": "alternative 2",
+      "confidence": 0.45,
+      "reason": "possible match because..."
+    }
+  ],
+  "actors": ["actor names if recognizable"],
+  "setting": "description",
+  "genre": ["genre1", "genre2"],
+  "era": "time period",
+  "country": "country",
+  "productionStyle": "style",
+  "sceneDescription": "detailed description",
+  "visualElements": ["element1", "element2"]
+}
+
+If you cannot identify the show at all, still provide 3 best guesses based on visual style and context.`;
 
         const result = await model.generateContent([
             { text: prompt },
@@ -122,10 +156,10 @@ export async function identifyContent(imageFile: File): Promise<{
     if (!analysis) return null;
 
     return {
-        title: analysis.showName || 'Unknown',
-        confidence: analysis.confidence,
+        title: analysis.primaryMatch.showName || 'Unknown',
+        confidence: analysis.primaryMatch.confidence,
         description: analysis.sceneDescription,
-        alternatives: analysis.alternativeMatches || []
+        alternatives: analysis.alternatives.map(a => a.showName)
     };
 }
 
@@ -142,14 +176,19 @@ async function fileToBase64(file: File): Promise<string> {
 function parseTextResponse(text: string): GeminiAnalysis {
     // Fallback parser for non-JSON responses
     return {
+        primaryMatch: {
+            showName: 'Unknown',
+            confidence: 0.5,
+            reason: 'Could not parse AI response'
+        },
+        alternatives: [],
         setting: extractField(text, 'setting') || 'Unknown',
         genre: extractField(text, 'genre')?.split(',').map(g => g.trim()) || [],
         era: extractField(text, 'era') || 'Unknown',
         country: extractField(text, 'country') || 'Unknown',
         productionStyle: extractField(text, 'production') || 'Unknown',
         sceneDescription: text.substring(0, 200),
-        visualElements: [],
-        confidence: 0.5
+        visualElements: []
     };
 }
 

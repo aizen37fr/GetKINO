@@ -73,14 +73,14 @@ export async function detectContent(
             if (geminiAnalysis) {
                 console.log('✨ Gemini analysis complete:', geminiAnalysis);
 
-                // Try exact show name first
-                if (geminiAnalysis.showName) {
-                    console.log(`🎯 Gemini identified: "${geminiAnalysis.showName}"`);
-                    const exactMatch = await detectFromFilename(geminiAnalysis.showName);
+                // Try primary match first
+                if (geminiAnalysis.primaryMatch.showName) {
+                    console.log(`🎯 Gemini identified: "${geminiAnalysis.primaryMatch.showName}"`);
+                    const exactMatch = await detectFromFilename(geminiAnalysis.primaryMatch.showName);
                     if (exactMatch) {
                         return {
                             ...exactMatch,
-                            confidence: geminiAnalysis.confidence,
+                            confidence: geminiAnalysis.primaryMatch.confidence,
                             overview: geminiAnalysis.sceneDescription || exactMatch.overview,
                             source: 'tmdb'
                         };
@@ -88,17 +88,15 @@ export async function detectContent(
                 }
 
                 // Try alternative matches
-                if (geminiAnalysis.alternativeMatches) {
-                    for (const altTitle of geminiAnalysis.alternativeMatches) {
-                        const altMatch = await detectFromFilename(altTitle);
-                        if (altMatch && altMatch.confidence > 0.6) {
-                            console.log(`✅ Found alternative match: "${altTitle}"`);
-                            return {
-                                ...altMatch,
-                                confidence: geminiAnalysis.confidence * 0.8,
-                                overview: geminiAnalysis.sceneDescription || altMatch.overview
-                            };
-                        }
+                for (const altMatch of geminiAnalysis.alternatives) {
+                    const tmdbMatch = await detectFromFilename(altMatch.showName);
+                    if (tmdbMatch && tmdbMatch.confidence > 0.6) {
+                        console.log(`✅ Found alternative match: "${altMatch.showName}"`);
+                        return {
+                            ...tmdbMatch,
+                            confidence: altMatch.confidence * 0.8,
+                            overview: geminiAnalysis.sceneDescription || tmdbMatch.overview
+                        };
                     }
                 }
 
