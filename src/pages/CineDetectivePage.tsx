@@ -6,6 +6,9 @@ import type { UniversalDetectionResult } from '../services/universalDetection';
 import { searchTVByTitle, searchMoviesByTitle } from '../services/tmdb';
 import { getGenreName } from '../data/genres';
 import { extractVideoFrames, getVideoMetadata, getFileType } from '../utils/videoProcessor';
+import { BatchProcessor } from '../utils/batchProcessor';
+import type { BatchJob, BatchProgress } from '../utils/batchProcessor';
+import BatchResults from '../components/BatchResults';
 
 export default function CineDetectiveHero() {
     const [image, setImage] = useState<string | null>(null);
@@ -23,18 +26,32 @@ export default function CineDetectiveHero() {
     const [videoProgress, setVideoProgress] = useState(0);
     const [extractedFrames, setExtractedFrames] = useState<number>(0);
 
+    // Batch processing states
+    const [batchMode, setBatchMode] = useState(false);
+    const [batchJobs, setBatchJobs] = useState<BatchJob[]>([]);
+    const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
+    const [batchProcessor] = useState(() => new BatchProcessor(3)); // 3 concurrent
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            processFile(file);
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 1) {
+            // Batch mode
+            processBatch(files);
+        } else if (files.length === 1) {
+            // Single file mode
+            processFile(files[0]);
         }
     };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            processFile(file);
+        const files = Array.from(e.target.files || []);
+        if (files.length > 1) {
+            // Batch mode
+            processBatch(files);
+        } else if (files.length === 1) {
+            // Single file mode
+            processFile(files[0]);
         }
     };
 
@@ -198,6 +215,42 @@ export default function CineDetectiveHero() {
             setIsScanning(false);
             setError('⚠️ Search failed. Please try again.');
         }
+    };
+
+    // Batch processing handler
+    const processBatch = async (files: File[]) => {
+        console.log(`📂 Batch mode: Processing ${files.length} files...`);
+
+        setBatchMode(true);
+        setImage(null);
+        setResult(null);
+        setError(null);
+        setBatchJobs([]);
+        setBatchProgress(null);
+
+        // Process all files
+        const jobs = await batchProcessor.processBatch(
+            files,
+            contentType,
+            (progress) => {
+                setBatchProgress(progress);
+                console.log(`📊 Batch progress: ${progress.percentage}%`, progress);
+            },
+            (job) => {
+                setBatchJobs(prev => {
+                    const index = prev.findIndex(j => j.id === job.id);
+                    if (index >= 0) {
+                        const newJobs = [...prev];
+                        newJobs[index] = job;
+                        return newJobs;
+                    }
+                    return [...prev, job];
+                });
+            }
+        );
+
+        setBatchJobs(jobs);
+        console.log(`✅ Batch complete: ${jobs.filter(j => j.status === 'complete').length}/${jobs.length} successful`);
     };
 
     return (
@@ -470,166 +523,219 @@ export default function CineDetectiveHero() {
                             id="fileInput"
                             type="file"
                             accept="image/*,video/*"
+                            multiple
                             onChange={handleFileSelect}
                             className="hidden"
                         />
                     </div>
 
-                    {/* Results Area */}
-                    <div className="bg-slate-900/50 backdrop-blur-sm border border-cyan-900/30 rounded-3xl p-8">
-                        {!result && !isScanning && !error && (
-                            <div className="h-full flex flex-col items-center justify-center text-center text-cyan-700">
-                                <Film className="w-20 h-20 mb-4 opacity-50" />
-                                <p className="text-xl">Upload a screenshot to begin</p>
-                                <p className="text-sm mt-2">AI detection results will appear here</p>
-                            </div>
-                        )}
-
-                        {isVideo && videoProgress > 0 && videoProgress < 100 && (
-                            <div className="text-center py-16">
-                                <motion.div
-                                    animate={{ rotate: 360 }}
-                                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                    className="mb-6"
-                                >
-                                    <Video className="w-16 h-16 mx-auto text-purple-500" />
-                                </motion.div>
-                                <h4 className="text-xl font-bold text-purple-400 mb-4">
-                                    Processing Video...
-                                </h4>
-                                <div className="w-full max-w-md mx-auto bg-slate-800 rounded-full h-3 overflow-hidden">
-                                    <motion.div
-                                        className="h-full bg-gradient-to-r from-purple-600 to-pink-600"
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${videoProgress}%` }}
-                                        transition={{ duration: 0.3 }}
-                                    />
-                                </div>
-                                <p className="text-cyan-600 mt-4">
-                                    {extractedFrames > 0 && `Extracted ${extractedFrames} frames • `}
-                                    {videoProgress}% complete
-                                </p>
-                            </div>
-                        )}
-
-                        {isScanning && !isVideo && (
-                            <div className="h-full flex flex-col items-center justify-center">
-                                <motion.div
-                                    animate={{ rotate: 360 }}
-                                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                    className="mb-6"
-                                >
-                                    <Scan className="w-20 h-20 text-cyan-400" />
-                                </motion.div>
-                                <h3 className="text-2xl font-bold text-cyan-100 mb-2">Scanning...</h3>
-                                <p className="text-cyan-600">
-                                    {contentType === 'all' && 'Analyzing with AI • Searching 820K+ titles'}
-                                    {contentType === 'anime' && '🎌 Searching anime database...'}
-                                    {contentType === 'kdrama-cdrama' && '🇰🇷 Searching K-dramas & C-dramas...'}
-                                    {contentType === 'movie-series' && '🎬 Searching movies & TV shows...'}
-                                </p>
-                            </div>
-                        )}
-
-                        {error && !result && !isScanning && (
-                            <div className="h-full flex flex-col items-center justify-center text-center">
-                                <div className="bg-red-900/20 border border-red-700/50 rounded-xl p-6 max-w-md">
-                                    <p className="text-red-400 text-lg mb-2">{error}</p>
-                                    <p className="text-red-600 text-sm">
-                                        Tips: Use screenshots with clear text, logos, or recognizable scenes
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {result && !isScanning && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="space-y-6"
-                            >
-                                {error && (
-                                    <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-3 text-yellow-400 text-sm">
-                                        {error}
-                                    </div>
-                                )}
-
-                                <div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="px-3 py-1 bg-cyan-900/30 border border-cyan-700/50 rounded-full text-xs text-cyan-400 uppercase font-semibold">
-                                            {result.type}
-                                        </span>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${result.confidence > 0.85 ? 'bg-green-900/30 border border-green-700/50 text-green-400' :
-                                            result.confidence > 0.70 ? 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-400' :
-                                                'bg-red-900/30 border border-red-700/50 text-red-400'
-                                            }`}>
-                                            {(result.confidence * 100).toFixed(0)}% Match
-                                        </span>
-                                    </div>
-
-                                    <h3 className="text-3xl font-bold text-cyan-100 mb-2">
-                                        {result.title}
+                    {/* Batch Mode UI */}
+                    {batchMode && (
+                        <div className="space-y-6">
+                            {/* Batch Progress */}
+                            {batchProgress && batchProgress.percentage < 100 && (
+                                <div className="bg-slate-900/50 backdrop-blur-sm border border-cyan-900/30 rounded-3xl p-6">
+                                    <h3 className="text-xl font-bold text-cyan-100 mb-4">
+                                        Processing Batch...
                                     </h3>
-
-                                    {result.originalTitle && (
-                                        <p className="text-cyan-600 text-sm">{result.originalTitle}</p>
-                                    )}
-                                </div>
-
-                                {result.overview && (
-                                    <p className="text-cyan-300 text-sm leading-relaxed">
-                                        {result.overview}
-                                    </p>
-                                )}
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    {result.year && (
-                                        <div className="bg-slate-800/50 border border-cyan-900/30 rounded-lg p-3">
-                                            <p className="text-xs text-cyan-600 uppercase mb-1">Year</p>
-                                            <p className="text-cyan-100 font-semibold">{result.year}</p>
-                                        </div>
-                                    )}
-
-                                    {result.episode && (
-                                        <div className="bg-slate-800/50 border border-cyan-900/30 rounded-lg p-3">
-                                            <p className="text-xs text-cyan-600 uppercase mb-1">Episode</p>
-                                            <p className="text-cyan-100 font-semibold">{result.episode}</p>
-                                        </div>
-                                    )}
-
-                                    {result.rating && (
-                                        <div className="bg-slate-800/50 border border-cyan-900/30 rounded-lg p-3">
-                                            <p className="text-xs text-cyan-600 uppercase mb-1">Rating</p>
-                                            <p className="text-cyan-100 font-semibold">⭐ {result.rating.toFixed(1)}/10</p>
-                                        </div>
-                                    )}
-
-                                    {result.timestamp && (
-                                        <div className="bg-slate-800/50 border border-cyan-900/30 rounded-lg p-3">
-                                            <p className="text-xs text-cyan-600 uppercase mb-1">Timestamp</p>
-                                            <p className="text-cyan-100 font-semibold">{result.timestamp}</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {result.genres && result.genres.length > 0 && (
-                                    <div>
-                                        <p className="text-xs text-cyan-600 uppercase mb-2">Genres</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {result.genres.map((genre, idx) => (
-                                                <span
-                                                    key={idx}
-                                                    className="px-3 py-1 bg-purple-900/30 border border-purple-700/50 rounded-full text-xs text-purple-300"
-                                                >
-                                                    {genre}
-                                                </span>
-                                            ))}
-                                        </div>
+                                    <div className="w-full bg-slate-800 rounded-full h-4 overflow-hidden mb-2">
+                                        <motion.div
+                                            className="h-full bg-gradient-to-r from-purple-600 to-pink-600"
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${batchProgress.percentage}%` }}
+                                            transition={{ duration: 0.3 }}
+                                        />
                                     </div>
-                                )}
-                            </motion.div>
-                        )}
-                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-cyan-400">
+                                            {batchProgress.completed + batchProgress.failed} / {batchProgress.total} files
+                                        </span>
+                                        <span className="text-purple-400">
+                                            {batchProgress.percentage}% complete
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Batch Results */}
+                            {batchJobs.length > 0 && (
+                                <BatchResults
+                                    jobs={batchJobs}
+                                    onRemoveJob={(jobId) => {
+                                        setBatchJobs(prev => prev.filter(j => j.id !== jobId));
+                                    }}
+                                    onClearAll={() => {
+                                        setBatchJobs([]);
+                                        setBatchMode(false);
+                                        setBatchProgress(null);
+                                        batchProcessor.clear();
+                                    }}
+                                    onAddAllToWatchlist={() => {
+                                        console.log('📋 Add all to watchlist:', batchJobs.filter(j => j.result));
+                                        // TODO: Implement watchlist functionality
+                                    }}
+                                />
+                            )}
+                        </div>
+                    )}
+
+                    {/* Results Area - Hide in batch mode */}
+                    {!batchMode && (
+                        <div className="bg-slate-900/50 backdrop-blur-sm border border-cyan-900/30 rounded-3xl p-8">
+                            {!result && !isScanning && !error && (
+                                <div className="h-full flex flex-col items-center justify-center text-center text-cyan-700">
+                                    <Film className="w-20 h-20 mb-4 opacity-50" />
+                                    <p className="text-xl">Upload a screenshot to begin</p>
+                                    <p className="text-sm mt-2">AI detection results will appear here</p>
+                                </div>
+                            )}
+
+                            {isVideo && videoProgress > 0 && videoProgress < 100 && (
+                                <div className="text-center py-16">
+                                    <motion.div
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                        className="mb-6"
+                                    >
+                                        <Video className="w-16 h-16 mx-auto text-purple-500" />
+                                    </motion.div>
+                                    <h4 className="text-xl font-bold text-purple-400 mb-4">
+                                        Processing Video...
+                                    </h4>
+                                    <div className="w-full max-w-md mx-auto bg-slate-800 rounded-full h-3 overflow-hidden">
+                                        <motion.div
+                                            className="h-full bg-gradient-to-r from-purple-600 to-pink-600"
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${videoProgress}%` }}
+                                            transition={{ duration: 0.3 }}
+                                        />
+                                    </div>
+                                    <p className="text-cyan-600 mt-4">
+                                        {extractedFrames > 0 && `Extracted ${extractedFrames} frames • `}
+                                        {videoProgress}% complete
+                                    </p>
+                                </div>
+                            )}
+
+                            {isScanning && !isVideo && (
+                                <div className="h-full flex flex-col items-center justify-center">
+                                    <motion.div
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                        className="mb-6"
+                                    >
+                                        <Scan className="w-20 h-20 text-cyan-400" />
+                                    </motion.div>
+                                    <h3 className="text-2xl font-bold text-cyan-100 mb-2">Scanning...</h3>
+                                    <p className="text-cyan-600">
+                                        {contentType === 'all' && 'Analyzing with AI • Searching 820K+ titles'}
+                                        {contentType === 'anime' && '🎌 Searching anime database...'}
+                                        {contentType === 'kdrama-cdrama' && '🇰🇷 Searching K-dramas & C-dramas...'}
+                                        {contentType === 'movie-series' && '🎬 Searching movies & TV shows...'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {error && !result && !isScanning && (
+                                <div className="h-full flex flex-col items-center justify-center text-center">
+                                    <div className="bg-red-900/20 border border-red-700/50 rounded-xl p-6 max-w-md">
+                                        <p className="text-red-400 text-lg mb-2">{error}</p>
+                                        <p className="text-red-600 text-sm">
+                                            Tips: Use screenshots with clear text, logos, or recognizable scenes
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {result && !isScanning && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="space-y-6"
+                                >
+                                    {error && (
+                                        <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-3 text-yellow-400 text-sm">
+                                            {error}
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="px-3 py-1 bg-cyan-900/30 border border-cyan-700/50 rounded-full text-xs text-cyan-400 uppercase font-semibold">
+                                                {result.type}
+                                            </span>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${result.confidence > 0.85 ? 'bg-green-900/30 border border-green-700/50 text-green-400' :
+                                                result.confidence > 0.70 ? 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-400' :
+                                                    'bg-red-900/30 border border-red-700/50 text-red-400'
+                                                }`}>
+                                                {(result.confidence * 100).toFixed(0)}% Match
+                                            </span>
+                                        </div>
+
+                                        <h3 className="text-3xl font-bold text-cyan-100 mb-2">
+                                            {result.title}
+                                        </h3>
+
+                                        {result.originalTitle && (
+                                            <p className="text-cyan-600 text-sm">{result.originalTitle}</p>
+                                        )}
+                                    </div>
+
+                                    {result.overview && (
+                                        <p className="text-cyan-300 text-sm leading-relaxed">
+                                            {result.overview}
+                                        </p>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {result.year && (
+                                            <div className="bg-slate-800/50 border border-cyan-900/30 rounded-lg p-3">
+                                                <p className="text-xs text-cyan-600 uppercase mb-1">Year</p>
+                                                <p className="text-cyan-100 font-semibold">{result.year}</p>
+                                            </div>
+                                        )}
+
+                                        {result.episode && (
+                                            <div className="bg-slate-800/50 border border-cyan-900/30 rounded-lg p-3">
+                                                <p className="text-xs text-cyan-600 uppercase mb-1">Episode</p>
+                                                <p className="text-cyan-100 font-semibold">{result.episode}</p>
+                                            </div>
+                                        )}
+
+                                        {result.rating && (
+                                            <div className="bg-slate-800/50 border border-cyan-900/30 rounded-lg p-3">
+                                                <p className="text-xs text-cyan-600 uppercase mb-1">Rating</p>
+                                                <p className="text-cyan-100 font-semibold">⭐ {result.rating.toFixed(1)}/10</p>
+                                            </div>
+                                        )}
+
+                                        {result.timestamp && (
+                                            <div className="bg-slate-800/50 border border-cyan-900/30 rounded-lg p-3">
+                                                <p className="text-xs text-cyan-600 uppercase mb-1">Timestamp</p>
+                                                <p className="text-cyan-100 font-semibold">{result.timestamp}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {result.genres && result.genres.length > 0 && (
+                                        <div>
+                                            <p className="text-xs text-cyan-600 uppercase mb-2">Genres</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {result.genres.map((genre, idx) => (
+                                                    <span
+                                                        key={idx}
+                                                        className="px-3 py-1 bg-purple-900/30 border border-purple-700/50 rounded-full text-xs text-purple-300"
+                                                    >
+                                                        {genre}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
+                        </div>
+                    )}
                 </motion.div>
             </div>
         </div>

@@ -4,6 +4,10 @@ const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
+// Use proxy for TMDB requests to bypass network restrictions
+const USE_PROXY = true;
+const PROXY_BASE = '/api/tmdb';
+
 // Mapping Moods to TMDB Genre IDs
 const MOOD_GENRES: Record<Mood, number[]> = {
     'Chill': [35, 10751, 16], // Comedy, Family, Animation
@@ -120,9 +124,17 @@ export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Lang
 export async function searchMoviesByTitle(title: string) {
     if (!API_KEY) return [];
 
-    const url = `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(title)}&include_adult=false`;
-
     try {
+        let url: string;
+
+        if (USE_PROXY) {
+            // Use serverless proxy to bypass network restrictions
+            url = `${PROXY_BASE}?endpoint=/search/movie&query=${encodeURIComponent(title)}&include_adult=false`;
+        } else {
+            // Direct API call
+            url = `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(title)}&include_adult=false`;
+        }
+
         const response = await fetch(url);
         const data = await response.json();
         return data.results || [];
@@ -138,9 +150,17 @@ export async function searchMoviesByTitle(title: string) {
 export async function searchTVByTitle(title: string) {
     if (!API_KEY) return [];
 
-    const url = `${BASE_URL}/search/tv?api_key=${API_KEY}&query=${encodeURIComponent(title)}&include_adult=false`;
-
     try {
+        let url: string;
+
+        if (USE_PROXY) {
+            // Use serverless proxy to bypass network restrictions
+            url = `${PROXY_BASE}?endpoint=/search/tv&query=${encodeURIComponent(title)}&include_adult=false`;
+        } else {
+            // Direct API call
+            url = `${BASE_URL}/search/tv?api_key=${API_KEY}&query=${encodeURIComponent(title)}&include_adult=false`;
+        }
+
         const response = await fetch(url);
         const data = await response.json();
         return data.results || [];

@@ -1,0 +1,35 @@
+    // Batch processing handler
+    const processBatch = async (files: File[]) => {
+        console.log(`📂 Batch mode: Processing ${files.length} files...`);
+        
+        setBatchMode(true);
+        setImage(null);
+        setResult(null);
+        setError(null);
+        setBatchJobs([]);
+        setBatchProgress(null);
+        
+        // Process all files
+        const jobs = await batchProcessor.processBatch(
+            files,
+            contentType,
+            (progress) => {
+                setBatchProgress(progress);
+                console.log(`📊 Batch progress: ${progress.percentage}%`, progress);
+            },
+            (job) => {
+                setBatchJobs(prev => {
+                    const index = prev.findIndex(j => j.id === job.id);
+                    if (index >= 0) {
+                        const newJobs = [...prev];
+                        newJobs[index] = job;
+                        return newJobs;
+                    }
+                    return [...prev, job];
+                });
+            }
+        );
+        
+        setBatchJobs(jobs);
+        console.log(`✅ Batch complete: ${jobs.filter(j => j.status === 'complete').length}/${jobs.length} successful`);
+    };
