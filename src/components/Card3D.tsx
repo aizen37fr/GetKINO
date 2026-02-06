@@ -55,7 +55,7 @@ export default function Card3D({ item, onClick }: Card3DProps) {
                 perspective: 1000,
                 transformStyle: 'preserve-3d',
             }}
-            className="relative cursor-pointer"
+            className="relative cursor-pointer group"
         >
             <motion.div
                 style={{
@@ -96,8 +96,16 @@ export default function Card3D({ item, onClick }: Card3DProps) {
                     }}
                 />
 
-                {/* Main card */}
-                <div className="relative w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl overflow-hidden border border-white/10">
+                {/* Main card with glassmorphism */}
+                <div className="relative w-full h-full 
+                    bg-gradient-to-br from-slate-900/95 to-slate-800/90
+                    backdrop-blur-xl
+                    rounded-2xl overflow-hidden 
+                    border border-cyan-500/30
+                    shadow-[0_0_30px_rgba(0,245,255,0.15)]
+                    group-hover:border-cyan-500/60
+                    group-hover:shadow-[0_0_50px_rgba(0,245,255,0.3)]
+                    transition-all duration-300">
                     {/* Image */}
                     <div className="relative w-full h-full">
                         <img
@@ -158,17 +166,19 @@ export default function Card3D({ item, onClick }: Card3DProps) {
                     </motion.div>
                 </div>
 
-                {/* Floating accent layer (appears behind on hover) */}
+                {/* Floating neon glow accent (appears behind on hover) */}
                 <motion.div
-                    className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-cyan-500/20 rounded-2xl blur-xl"
+                    className="absolute inset-0 rounded-2xl blur-2xl"
                     style={{
                         z: -15,
                         scale: 0.95,
+                        background: 'radial-gradient(circle at 50% 50%, rgba(0, 245, 255, 0.4), rgba(168, 85, 247, 0.3), transparent)'
                     }}
                     animate={{
-                        opacity: isHovered ? 0.8 : 0,
-                        scale: isHovered ? 1.1 : 0.95,
+                        opacity: isHovered ? 1 : 0,
+                        scale: isHovered ? 1.15 : 0.95,
                     }}
+                    transition={{ duration: 0.3 }}
                 />
             </motion.div>
         </motion.div>

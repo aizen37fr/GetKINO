@@ -4,6 +4,8 @@ import AuthPage from './pages/Auth';
 import CineDetectivePage from './pages/CineDetectivePage';
 import MatchMode from './pages/MatchMode';
 import AIChatbot from './components/AIChatbot';
+// import { ParticleBackground } from './components/3D/ParticleBackground';
+import { CursorEffect } from './components/3D/CursorEffect';
 
 function AppContent() {
   const { user } = useAuth();
@@ -33,6 +35,10 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
+      {/* 3D Background Effects */}
+      {/* <ParticleBackground theme="default" /> */}
+      {/* <CursorEffect /> */}
+
       <AppContent />
     </AuthProvider>
   );

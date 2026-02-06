@@ -9,6 +9,7 @@ import { extractVideoFrames, getVideoMetadata, getFileType } from '../utils/vide
 import { BatchProcessor } from '../utils/batchProcessor';
 import type { BatchJob, BatchProgress } from '../utils/batchProcessor';
 import BatchResults from '../components/BatchResults';
+import { AnimatedBackground } from '../components/Effects/AnimatedBackground';
 
 export default function CineDetectiveHero() {
     const [image, setImage] = useState<string | null>(null);
@@ -254,55 +255,72 @@ export default function CineDetectiveHero() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Animated background */}
-            <div className="absolute inset-0">
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-            </div>
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+            {/* Animated 3D Background */}
+            <AnimatedBackground />
 
             <div className="max-w-7xl w-full relative z-10">
-                {/* Hero Header */}
+                {/* Hero Header with 3D Effects */}
                 <motion.div
                     initial={{ opacity: 0, y: -50 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-12"
+                    whileHover={{ scale: 1.02 }}
+                    className="text-center mb-12 relative"
                 >
-                    <div className="flex items-center justify-center gap-3 mb-4">
-                        <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                        >
-                            <Scan className="w-16 h-16 text-cyan-400" />
-                        </motion.div>
-                        <h1 className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                            CineDetective
-                        </h1>
-                    </div>
+                    {/* Floating 3D Title Container */}
+                    <motion.div
+                        animate={{ y: [0, -10, 0] }}
+                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                        className="relative"
+                    >
+                        <div className="flex items-center justify-center gap-3 mb-4">
+                            <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                                className="relative"
+                            >
+                                <Scan className="w-16 h-16 text-cyan-400 drop-shadow-[0_0_20px_rgba(0,245,255,0.6)]" />
+                            </motion.div>
+                            <h1 className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 bg-clip-text text-transparent
+                                drop-shadow-[0_0_30px_rgba(0,245,255,0.3)]">
+                                CineDetective
+                            </h1>
+                        </div>
 
-                    <p className="text-2xl md:text-3xl text-cyan-300 font-light mb-4">
-                        AI-Powered Universal Content Recognition
-                    </p>
+                        <p className="text-2xl md:text-3xl text-cyan-300 font-light mb-4
+                            drop-shadow-[0_0_10px_rgba(0,245,255,0.2)]">
+                            AI-Powered Universal Content Recognition
+                        </p>
 
-                    <p className="text-cyan-600 text-lg max-w-2xl mx-auto">
-                        Upload any screenshot from movies, TV shows, anime, K-dramas, or C-dramas.
-                        Our AI instantly identifies it from <span className="text-cyan-400 font-bold">820,000+ titles</span>!
-                    </p>
+                        <p className="text-cyan-600 text-lg max-w-2xl mx-auto">
+                            Upload any screenshot from movies, TV shows, anime, K-dramas, or C-dramas.
+                            Our AI instantly identifies it from <span className="text-cyan-400 font-bold">820,000+ titles</span>!
+                        </p>
+                    </motion.div>
 
-                    {/* Stats */}
+                    {/* Stats with glassmorphism */}
                     <div className="flex flex-wrap items-center justify-center gap-6 mt-8">
-                        <div className="flex items-center gap-2 text-cyan-400">
-                            <Globe className="w-5 h-5" />
-                            <span className="font-semibold">820K+ Titles</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-purple-400">
-                            <Zap className="w-5 h-5" />
-                            <span className="font-semibold">Instant Detection</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-pink-400">
-                            <Sparkles className="w-5 h-5" />
-                            <span className="font-semibold">AI-Powered</span>
-                        </div>
+                        <motion.div
+                            whileHover={{ scale: 1.1, y: -5 }}
+                            className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 backdrop-blur-sm rounded-full border border-cyan-500/30"
+                        >
+                            <Globe className="w-5 h-5 text-cyan-400" />
+                            <span className="font-semibold text-cyan-400">820K+ Titles</span>
+                        </motion.div>
+                        <motion.div
+                            whileHover={{ scale: 1.1, y: -5 }}
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-500/10 backdrop-blur-sm rounded-full border border-purple-500/30"
+                        >
+                            <Zap className="w-5 h-5 text-purple-400" />
+                            <span className="font-semibold text-purple-400">Instant Detection</span>
+                        </motion.div>
+                        <motion.div
+                            whileHover={{ scale: 1.1, y: -5 }}
+                            className="flex items-center gap-2 px-4 py-2 bg-pink-500/10 backdrop-blur-sm rounded-full border border-pink-500/30"
+                        >
+                            <Sparkles className="w-5 h-5 text-pink-400" />
+                            <span className="font-semibold text-pink-400">AI-Powered</span>
+                        </motion.div>
                     </div>
                 </motion.div>
 
@@ -468,12 +486,19 @@ export default function CineDetectiveHero() {
                     transition={{ delay: 0.2 }}
                     className="grid md:grid-cols-2 gap-8"
                 >
-                    {/* Upload Zone */}
-                    <div
+                    {/* 3D Upload Zone with Glassmorphism */}
+                    <motion.div
                         onDrop={handleDrop}
                         onDragOver={(e) => e.preventDefault()}
-                        className="bg-slate-900/50 backdrop-blur-sm border-2 border-dashed border-cyan-900/50 rounded-3xl p-12 hover:border-cyan-700/70 transition-all cursor-pointer group"
                         onClick={() => document.getElementById('fileInput')?.click()}
+                        whileHover={{ scale: 1.02, y: -5 }}
+                        className="relative bg-gradient-to-br from-slate-900/80 to-slate-800/60
+                            backdrop-blur-2xl border-2 border-dashed border-cyan-500/40
+                            rounded-3xl p-12 cursor-pointer group
+                            shadow-[0_0_40px_rgba(0,245,255,0.1)]
+                            hover:border-cyan-400/80
+                            hover:shadow-[0_0_60px_rgba(0,245,255,0.25)]
+                            transition-all duration-300"
                     >
                         {!image ? (
                             <div className="text-center">
@@ -527,7 +552,7 @@ export default function CineDetectiveHero() {
                             onChange={handleFileSelect}
                             className="hidden"
                         />
-                    </div>
+                    </motion.div>
 
                     {/* Batch Mode UI */}
                     {batchMode && (
