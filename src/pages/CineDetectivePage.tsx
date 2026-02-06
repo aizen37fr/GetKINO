@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Upload, Scan, Sparkles, Film, Zap, Globe } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, Scan, Sparkles, Film, Zap, Globe, Search, X } from 'lucide-react';
 import { detectContent } from '../services/universalDetection';
 import type { UniversalDetectionResult } from '../services/universalDetection';
+import { searchTVByTitle, searchMoviesByTitle } from '../services/tmdb';
+import { getGenreName } from '../data/genres';
 
 export default function CineDetectiveHero() {
     const [image, setImage] = useState<string | null>(null);
@@ -10,6 +12,10 @@ export default function CineDetectiveHero() {
     const [result, setResult] = useState<UniversalDetectionResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [contentType, setContentType] = useState<'all' | 'anime' | 'movie-series' | 'kdrama-cdrama'>('all');
+
+    // Manual search states
+    const [showManualSearch, setShowManualSearch] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
@@ -83,6 +89,58 @@ export default function CineDetectiveHero() {
         }
     };
 
+    const handleManualSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!searchQuery.trim()) return;
+
+        setIsScanning(true);
+        setError(null);
+        setResult(null);
+
+        try {
+            console.log('🔍 Manual search:', { searchQuery, contentType });
+
+            // Search TV shows and movies
+            const [tvResults, movieResults] = await Promise.all([
+                searchTVByTitle(searchQuery),
+                searchMoviesByTitle(searchQuery)
+            ]);
+
+            const searchResults = [...(tvResults || []), ...(movieResults || [])];
+
+            if (searchResults.length > 0) {
+                const item = searchResults[0];
+                const isTV = 'name' in item;
+
+                setResult({
+                    type: isTV ? 'tv' : 'movie',
+                    title: isTV ? item.name : item.title,
+                    originalTitle: isTV ? item.original_name : item.original_title,
+                    confidence: 0.95,
+                    year: isTV
+                        ? (item.first_air_date ? new Date(item.first_air_date).getFullYear() : undefined)
+                        : (item.release_date ? new Date(item.release_date).getFullYear() : undefined),
+                    genres: item.genre_ids?.map((id: number) => getGenreName(id)) || [],
+                    rating: item.vote_average,
+                    image: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '',
+                    backdrop: item.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : undefined,
+                    overview: item.overview,
+                    source: 'manual-search'
+                });
+                setIsScanning(false);
+                setShowManualSearch(false);
+            } else {
+                setIsScanning(false);
+                setError(`❌ No results found for "${searchQuery}". Try a different search term.`);
+            }
+
+        } catch (error) {
+            console.error('Manual search error:', error);
+            setIsScanning(false);
+            setError('⚠️ Search failed. Please try again.');
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
             {/* Animated background */}
@@ -152,8 +210,8 @@ export default function CineDetectiveHero() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setContentType('all')}
                             className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'all'
-                                    ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-lg shadow-cyan-500/50'
-                                    : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-lg shadow-cyan-500/50'
+                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
                                 }`}
                         >
                             🌐 All Content
@@ -164,8 +222,8 @@ export default function CineDetectiveHero() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setContentType('anime')}
                             className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'anime'
-                                    ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/50'
-                                    : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-500/50'
+                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
                                 }`}
                         >
                             🎌 Anime
@@ -176,8 +234,8 @@ export default function CineDetectiveHero() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setContentType('movie-series')}
                             className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'movie-series'
-                                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/50'
-                                    : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/50'
+                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
                                 }`}
                         >
                             🎬 Movies / TV Series
@@ -188,14 +246,108 @@ export default function CineDetectiveHero() {
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setContentType('kdrama-cdrama')}
                             className={`px-6 py-3 rounded-xl font-semibold transition-all ${contentType === 'kdrama-cdrama'
-                                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/50'
-                                    : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
+                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/50'
+                                : 'bg-slate-800/50 border border-cyan-900/30 text-cyan-400 hover:border-cyan-700/50'
                                 }`}
                         >
                             🇰🇷 K-Drama / C-Drama
                         </motion.button>
                     </div>
                 </motion.div>
+
+                {/* Manual Search Button */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="mb-8 flex justify-center"
+                >
+                    <motion.button
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowManualSearch(!showManualSearch)}
+                        className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full font-semibold shadow-lg shadow-purple-500/50 hover:shadow-purple-500/80 transition-all flex items-center gap-2"
+                    >
+                        <Search className="w-5 h-5" />
+                        {showManualSearch ? 'Hide Search' : 'Search by Name'}
+                    </motion.button>
+                </motion.div>
+
+                {/* Animated Manual Search Panel */}
+                <AnimatePresence>
+                    {showManualSearch && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0, y: -20 }}
+                            animate={{ opacity: 1, height: 'auto', y: 0 }}
+                            exit={{ opacity: 0, height: 0, y: -20 }}
+                            transition={{ duration: 0.3 }}
+                            className="mb-8 overflow-hidden"
+                        >
+                            <motion.div
+                                className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 backdrop-blur-sm border border-purple-500/30 rounded-3xl p-8 max-w-2xl mx-auto"
+                                initial={{ scale: 0.9 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: 0.1 }}
+                            >
+                                <div className="text-center mb-6">
+                                    <h3 className="text-2xl font-bold text-transparent bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text mb-2">
+                                        Search by Title
+                                    </h3>
+                                    <p className="text-cyan-600 text-sm">
+                                        Type the name of any movie, TV show, K-drama, or anime
+                                    </p>
+                                </div>
+
+                                <form onSubmit={handleManualSearch} className="space-y-4">
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="e.g., Squid Game, Breaking Bad, Demon Slayer..."
+                                            className="w-full px-6 py-4 bg-slate-900/50 border-2 border-purple-500/30 rounded-xl text-cyan-100 placeholder-cyan-700 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 transition-all text-lg"
+                                            autoFocus
+                                        />
+                                        {searchQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSearchQuery('')}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-cyan-600 hover:text-cyan-400 transition-colors"
+                                            >
+                                                <X className="w-5 h-5" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <motion.button
+                                        type="submit"
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        disabled={!searchQuery.trim() || isScanning}
+                                        className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-purple-500/50 hover:shadow-purple-500/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                                    >
+                                        {isScanning ? (
+                                            <>
+                                                <motion.div
+                                                    animate={{ rotate: 360 }}
+                                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                                >
+                                                    <Search className="w-5 h-5" />
+                                                </motion.div>
+                                                Searching...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Search className="w-5 h-5" />
+                                                Search Now
+                                            </>
+                                        )}
+                                    </motion.button>
+                                </form>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Main Upload Area */}
                 <motion.div
@@ -322,8 +474,8 @@ export default function CineDetectiveHero() {
                                             {result.type}
                                         </span>
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${result.confidence > 0.85 ? 'bg-green-900/30 border border-green-700/50 text-green-400' :
-                                                result.confidence > 0.70 ? 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-400' :
-                                                    'bg-red-900/30 border border-red-700/50 text-red-400'
+                                            result.confidence > 0.70 ? 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-400' :
+                                                'bg-red-900/30 border border-red-700/50 text-red-400'
                                             }`}>
                                             {(result.confidence * 100).toFixed(0)}% Match
                                         </span>
