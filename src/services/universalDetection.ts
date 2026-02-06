@@ -6,6 +6,7 @@
 
 import { searchAnimeByFile, getAnimeDetails } from './tracemoe';
 import { searchMoviesByTitle, searchTVByTitle } from './tmdb';
+import { analyzeWithGemini } from './gemini';
 
 export type ContentType = 'anime' | 'movie' | 'tv' | 'unknown';
 
@@ -59,22 +60,63 @@ export async function detectContent(
             // ONLY TMDB - completely skip anime detection
             console.log('🎬 Searching ONLY movies/TV/K-dramas (skipping anime)...');
 
-            // Try filename first
+            // STEP 1: Try filename first (fastest)
             const tmdbResult = await detectFromFilename(imageFile.name);
             if (tmdbResult && tmdbResult.confidence > 0.7) {
                 console.log('✅ Found via filename');
                 return tmdbResult;
             }
 
-            // If filename fails, use AI to help
-            const aiAnalysis = await analyzeWithDeepSeek(imageFile);
-            if (aiAnalysis?.description) {
-                console.log('🤖 Using AI description to search TMDB...');
-                // Extract potential title from AI description
-                const words = aiAnalysis.description.split(' ').slice(0, 5).join(' ');
-                const searchResult = await detectFromFilename(words);
-                if (searchResult) {
-                    return searchResult;
+            // STEP 2: Advanced Gemini Vision AI Analysis 🤖
+            console.log('🤖 Gemini: Analyzing screenshot with AI...');
+            const geminiAnalysis = await analyzeWithGemini(imageFile);
+            if (geminiAnalysis) {
+                console.log('✨ Gemini analysis complete:', geminiAnalysis);
+
+                // Try exact show name first
+                if (geminiAnalysis.showName) {
+                    console.log(`🎯 Gemini identified: "${geminiAnalysis.showName}"`);
+                    const exactMatch = await detectFromFilename(geminiAnalysis.showName);
+                    if (exactMatch) {
+                        return {
+                            ...exactMatch,
+                            confidence: geminiAnalysis.confidence,
+                            overview: geminiAnalysis.sceneDescription || exactMatch.overview,
+                            source: 'tmdb'
+                        };
+                    }
+                }
+
+                // Try alternative matches
+                if (geminiAnalysis.alternativeMatches) {
+                    for (const altTitle of geminiAnalysis.alternativeMatches) {
+                        const altMatch = await detectFromFilename(altTitle);
+                        if (altMatch && altMatch.confidence > 0.6) {
+                            console.log(`✅ Found alternative match: "${altTitle}"`);
+                            return {
+                                ...altMatch,
+                                confidence: geminiAnalysis.confidence * 0.8,
+                                overview: geminiAnalysis.sceneDescription || altMatch.overview
+                            };
+                        }
+                    }
+                }
+
+                // Smart search using AI description
+                const searchTerms = [
+                    `${geminiAnalysis.country} ${geminiAnalysis.genre[0]} ${geminiAnalysis.era}`,
+                    geminiAnalysis.sceneDescription.split(' ').slice(0, 5).join(' ')
+                ];
+
+                for (const term of searchTerms) {
+                    const searchResult = await detectFromFilename(term);
+                    if (searchResult && searchResult.confidence > 0.5) {
+                        return {
+                            ...searchResult,
+                            confidence: 0.6,
+                            overview: geminiAnalysis.sceneDescription || searchResult.overview
+                        };
+                    }
                 }
             }
 
