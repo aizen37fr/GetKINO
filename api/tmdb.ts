@@ -6,7 +6,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
-const API_KEY = process.env.VITE_TMDB_API_KEY;
+// Try both TMDB_API_KEY (Vercel) and VITE_TMDB_API_KEY (fallback)
+const API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Enable CORS
