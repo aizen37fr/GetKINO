@@ -20,6 +20,8 @@ export default function CineDetectiveHero() {
     // Manual search states
     const [showManualSearch, setShowManualSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
 
     // Video processing states
     const [isVideo, setIsVideo] = useState(false);
@@ -172,36 +174,50 @@ export default function CineDetectiveHero() {
         setIsScanning(true);
         setError(null);
         setResult(null);
+        setSearchResults([]);
 
         try {
             console.log('🔍 Manual search:', { searchQuery, contentType });
 
             // Search using OMDb API (works without network restrictions)
-            const searchResults = await searchByTitle(searchQuery);
+            const allResults = await searchByTitle(searchQuery);
 
-            if (searchResults.length > 0) {
-                // Get detailed info for the first result
-                const firstResult = searchResults[0];
-                const details = await getDetails(firstResult.imdbID);
+            if (allResults.length > 0) {
+                // Filter based on content type selection
+                let filteredResults = allResults;
 
-                if (details) {
-                    // Convert to our format
-                    const contentItem = convertToContentItem(details);
+                if (contentType === 'kdrama-cdrama' || contentType === 'movie-series') {
+                    // Only show TV series for kdrama/cdrama
+                    filteredResults = allResults.filter(r => r.Type === 'series');
+                }
 
-                    setResult({
-                        type: contentItem.type === 'tv' ? 'tv' : 'movie',
-                        title: contentItem.title,
-                        originalTitle: contentItem.title,
-                        confidence: 0.95,
-                        year: contentItem.year,
-                        genres: contentItem.genres,
-                        rating: contentItem.rating,
-                        image: contentItem.image || '',
-                        overview: contentItem.overview,
-                        source: 'manual-search'
-                    });
-                    setIsScanning(false);
+                // Sort: TV series first, then by year (newest first)
+                const sortedResults = filteredResults.sort((a, b) => {
+                    if (a.Type === 'series' && b.Type !== 'series') return -1;
+                    if (b.Type === 'series' && a.Type !== 'series') return 1;
+                    const yearA = parseInt(a.Year.substring(0, 4)) || 0;
+                    const yearB = parseInt(b.Year.substring(0, 4)) || 0;
+                    return yearB - yearA;
+                });
+
+                // Get details for top 6 results
+                const resultsWithDetails = await Promise.all(
+                    sortedResults.slice(0, 6).map(async (item) => {
+                        const details = await getDetails(item.imdbID);
+                        if (details) {
+                            return { ...convertToContentItem(details), imdbID: item.imdbID };
+                        }
+                        return null;
+                    })
+                );
+
+                const validResults = resultsWithDetails.filter(r => r !== null);
+
+                if (validResults.length > 0) {
+                    setSearchResults(validResults);
+                    setShowSearchResults(true);
                     setShowManualSearch(false);
+                    setIsScanning(false);
                 } else {
                     throw new Error('Could not get details');
                 }
@@ -215,6 +231,24 @@ export default function CineDetectiveHero() {
             setIsScanning(false);
             setError('⚠️ Search failed. Please try again.');
         }
+    };
+
+    // Handle result selection from search results
+    const handleSelectResult = (selectedResult: any) => {
+        setResult({
+            type: selectedResult.type === 'tv' ? 'tv' : 'movie',
+            title: selectedResult.title,
+            originalTitle: selectedResult.title,
+            confidence: 0.95,
+            year: selectedResult.year,
+            genres: selectedResult.genres,
+            rating: selectedResult.rating,
+            image: selectedResult.image || '',
+            overview: selectedResult.overview,
+            source: 'manual-search'
+        });
+        setShowSearchResults(false);
+        setSearchResults([]);
     };
 
     // Batch processing handler
@@ -474,6 +508,89 @@ export default function CineDetectiveHero() {
                                     </motion.button>
                                 </form>
                             </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Search Results Grid */}
+                <AnimatePresence>
+                    {showSearchResults && searchResults.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="fixed inset-0 bg-gradient-to-br from-slate-950 via-blue-950/70 to-purple-950/70 backdrop-blur-xl z-40 flex items-center justify-center p-4 overflow-y-auto"
+                        >
+                            <div className="max-w-6xl w-full my-8">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                                        Select Your {contentType === 'kdrama-cdrama' ? 'Drama' : 'Title'} ({searchResults.length} results)
+                                    </h2>
+                                    <button
+                                        onClick={() => {
+                                            setShowSearchResults(false);
+                                            setSearchResults([]);
+                                            setShowManualSearch(true);
+                                        }}
+                                        className="p-2 rounded-full bg-red-600/20 hover:bg-red-600/40 transition-colors"
+                                    >
+                                        <X className="w-6 h-6 text-red-400" />
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {searchResults.map((item: any, index: number) => (
+                                        <motion.div
+                                            key={item.imdbID || index}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: index * 0.1 }}
+                                            onClick={() => handleSelectResult(item)}
+                                            className="group relative bg-gradient-to-br from-slate-900/90 to-blue-950/50 backdrop-blur-xl border border-cyan-500/20 rounded-2xl overflow-hidden cursor-pointer hover:scale-105 hover:border-cyan-400/50 transition-all duration-300"
+                                        >
+                                            {item.image && item.image !== 'N/A' ? (
+                                                <img
+                                                    src={item.image}
+                                                    alt={item.title}
+                                                    className="w-full h-64 object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-64 bg-gradient-to-br from-slate-800 to-blue-900 flex items-center justify-center">
+                                                    <Film className="w-16 h-16 text-cyan-600" />
+                                                </div>
+                                            )}
+
+                                            <div className="p-4 space-y-2">
+                                                <h3 className="text-xl font-bold text-white line-clamp-1">
+                                                    {item.title}
+                                                </h3>
+
+                                                <div className="flex items-center gap-3 text-sm">
+                                                    <span className="px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                                        {item.type === 'tv' ? '📺 Series' : '🎬 Movie'}
+                                                    </span>
+                                                    <span className="text-slate-400">{item.year}</span>
+                                                    <span className="text-yellow-400">⭐ {item.rating}/10</span>
+                                                </div>
+
+                                                <p className="text-slate-400 text-sm line-clamp-3">
+                                                    {item.overview}
+                                                </p>
+
+                                                <div className="flex flex-wrap gap-1">
+                                                    {item.genres?.slice(0, 3).map((genre: string) => (
+                                                        <span key={genre} className="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-300">
+                                                            {genre}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="absolute inset-0 bg-gradient-to-t from-cyan-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
