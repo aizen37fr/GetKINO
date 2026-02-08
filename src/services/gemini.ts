@@ -49,7 +49,7 @@ export async function analyzeWithGemini(imageFile: File): Promise<GeminiAnalysis
         const base64Data = base64.split(',')[1]; // Remove data:image/... prefix
 
         // Use Gemini 2.0 Flash for vision (fastest, Pro subscription)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
 
         const prompt = `Analyze this screenshot from a TV show or movie. Provide detailed information and your TOP 3 MOST LIKELY MATCHES.
 
