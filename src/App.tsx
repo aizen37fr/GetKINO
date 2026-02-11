@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthPage from './pages/Auth';
+import LandingPage from './pages/LandingPage';
 import CineDetectivePage from './pages/CineDetectivePage';
 import MatchMode from './pages/MatchMode';
 import AIChatbot from './components/AIChatbot';
@@ -9,12 +10,19 @@ import AIChatbot from './components/AIChatbot';
 
 function AppContent() {
   const { user } = useAuth();
-  const [currentPage, setCurrentPage] = useState<'detective' | 'match'>('detective');
+  const [currentPage, setCurrentPage] = useState<'landing' | 'detective' | 'match'>('landing');
 
+  // Landing Page - Al ways show first (for both logged in and not logged in users)
+  if (currentPage === 'landing') {
+    return <LandingPage onGetStarted={() => setCurrentPage('detective')} />;
+  }
+
+  // Auth required for other pages
   if (!user) {
     return <AuthPage />;
   }
 
+  // Match Mode
   if (currentPage === 'match') {
     return (
       <>
@@ -24,6 +32,7 @@ function AppContent() {
     );
   }
 
+  // Detective Page - Main app experience
   return (
     <>
       <CineDetectivePage />
@@ -45,3 +54,4 @@ function App() {
 }
 
 export default App
+

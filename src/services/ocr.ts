@@ -14,8 +14,11 @@ export async function extractTextFromImage(imageFile: File): Promise<{
 
         const result = await Tesseract.recognize(
             imageFile,
-            'eng+kor+chi_sim+chi_tra', // English + Korean + Simplified Chinese + Traditional Chinese
+            'eng', // English only for now - faster and more accurate for most K-drama posters with English titles
             {
+                langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+                workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+                corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
                 logger: (m) => {
                     if (m.status === 'recognizing text') {
                         console.log(`OCR Progress: ${(m.progress * 100).toFixed(0)}%`);
@@ -59,7 +62,7 @@ export function extractPotentialTitles(text: string, words: string[]): string[] 
     const titles: string[] = [];
 
     // 1. Try to find title-like patterns (all caps, quoted text, etc.)
-    const allCapsMatches = text.match(/[A-Z][A-Z\s]{3,}/g);
+    const allCapsMatches = text.match(/[A-Z][A-Z\s]{4,}/g); // Increased minimum from 3 to 5 characters
     if (allCapsMatches) {
         titles.push(...allCapsMatches.map(t => t.trim()));
     }
@@ -70,13 +73,22 @@ export function extractPotentialTitles(text: string, words: string[]): string[] 
         titles.push(...quotedMatches.map(t => t.replace(/"/g, '').trim()));
     }
 
-    // 3. Use first few words (often the title)
-    if (words.length >= 2) {
-        titles.push(words.slice(0, 3).join(' '));
-        titles.push(words.slice(0, 4).join(' '));
+    // 3. Find the longest words (likely the title on posters)
+    const sortedWords = [...words].sort((a, b) => b.length - a.length);
+    if (sortedWords.length > 0) {
+        // Add top 3 longest words as potential titles
+        titles.push(...sortedWords.slice(0, 3));
     }
 
-    // 4. Look for Korean/Chinese text (likely the title)
+    // 4. Use first few words (often the title)
+    if (words.length >= 2) {
+        titles.push(words.slice(0, 2).join(' '));
+        if (words.length >= 3) {
+            titles.push(words.slice(0, 3).join(' '));
+        }
+    }
+
+    // 5. Look for Korean/Chinese text (likely the title)
     const koreanMatches = text.match(/[가-힣]{2,}/g);
     if (koreanMatches) {
         titles.push(...koreanMatches);
@@ -87,8 +99,8 @@ export function extractPotentialTitles(text: string, words: string[]): string[] 
         titles.push(...chineseMatches);
     }
 
-    // Remove duplicates and sort by length (longer = more specific)
+    // Remove duplicates, filter out very short titles, and sort by length (longer = more specific)
     return [...new Set(titles)]
-        .filter(t => t.length >= 3)
+        .filter(t => t.length >= 4) // Increased from 3 to 4 to filter out "Le", "De", etc.
         .sort((a, b) => b.length - a.length);
 }

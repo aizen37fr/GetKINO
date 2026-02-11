@@ -7,7 +7,6 @@
 import { searchAnimeByFile, getAnimeDetails } from './tracemoe';
 import { searchMoviesByTitle, searchTVByTitle } from './tmdb';
 import { analyzeWithGemini } from './gemini';
-import { identifyDramaFromImage } from './geminiVision';
 import { searchByTitle as searchOMDb, getDetails as getOMDbDetails, convertToContentItem } from './omdb';
 
 export type ContentType = 'anime' | 'movie' | 'tv' | 'unknown';
@@ -72,58 +71,63 @@ export async function detectContent(
             // ONLY TMDB - completely skip anime detection
             console.log('🎬 Searching ONLY movies/TV/K-dramas (skipping anime)...');
 
-            // STEP 0: Try Gemini Vision first for drama images! 🤖
+            // STEP 0: Try OCR text extraction for drama posters! 📝
             if (contentType === 'kdrama-cdrama') {
-                console.log('🤖 Gemini Vision: Analyzing K-drama/C-drama screenshot...');
+                console.log('📝 OCR: Extracting text from K-drama/C-drama poster...');
 
-                // Convert File to data URL for Gemini
-                const imageDataUrl = await new Promise<string>((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.readAsDataURL(imageFile);
-                });
+                try {
+                    const { extractTextFromImage, extractPotentialTitles } = await import('./ocr');
+                    const ocrResult = await extractTextFromImage(imageFile);
 
-                const dramaResult = await identifyDramaFromImage(imageDataUrl);
+                    console.log('📊 OCR Full Result:', {
+                        text: ocrResult.text,
+                        confidence: ocrResult.confidence,
+                        wordCount: ocrResult.words.length
+                    });
 
-                if (dramaResult && dramaResult.confidence > 0.6) {
-                    console.log('✅ Gemini identified drama:', dramaResult.title);
+                    if (ocrResult.confidence > 0.3 && ocrResult.text) { // Lowered from 0.5 to 0.3
+                        console.log('✅ OCR extracted text:', ocrResult.text.substring(0, 100));
 
-                    // Search OMDb for full details
-                    const omdbResults = await searchOMDb(dramaResult.title);
-                    if (omdbResults.length > 0) {
-                        const details = await getOMDbDetails(omdbResults[0].imdbID);
-                        if (details) {
-                            const contentItem = convertToContentItem(details);
-                            return {
-                                type: 'tv',
-                                title: contentItem.title,
-                                originalTitle: dramaResult.originalTitle,
-                                confidence: dramaResult.confidence,
-                                year: contentItem.year || dramaResult.year,
-                                genres: contentItem.genres,
-                                rating: contentItem.rating,
-                                image: contentItem.image,
-                                overview: contentItem.overview,
-                                source: 'tmdb' as const
-                            };
+                        // Get potential drama titles from extracted text
+                        const possibleTitles = extractPotentialTitles(ocrResult.text, ocrResult.words);
+                        console.log('🎯 Potential titles found:', possibleTitles);
+
+                        // Try each potential title with OMDb
+                        for (const title of possibleTitles.slice(0, 3)) { // Try top 3 candidates
+                            console.log(`🔍 Searching OMDb for: "${title}"`);
+                            const omdbResults = await searchOMDb(title);
+
+                            if (omdbResults.length > 0) {
+                                // Prioritize TV series
+                                const tvSeries = omdbResults.find(r => r.Type === 'series') || omdbResults[0];
+                                const details = await getOMDbDetails(tvSeries.imdbID);
+
+                                if (details) {
+                                    const contentItem = convertToContentItem(details);
+                                    console.log('✅ Found drama via OCR:', contentItem.title);
+
+                                    return {
+                                        type: 'tv',
+                                        title: contentItem.title,
+                                        confidence: ocrResult.confidence,
+                                        year: contentItem.year,
+                                        genres: contentItem.genres,
+                                        rating: contentItem.rating,
+                                        image: contentItem.image,
+                                        overview: contentItem.overview,
+                                        source: 'tmdb' as const
+                                    };
+                                }
+                            }
                         }
-                    }
 
-                    // Even if OMDb fails, return basic info from Gemini
-                    return {
-                        type: 'tv',
-                        title: dramaResult.title,
-                        originalTitle: dramaResult.originalTitle,
-                        confidence: dramaResult.confidence,
-                        year: dramaResult.year,
-                        genres: [],
-                        rating: 0,
-                        image: '',
-                        overview: `Detected ${dramaResult.type === 'kdrama' ? 'Korean' : 'Chinese'} drama from screenshot`,
-                        source: 'tmdb' as const
-                    };
+                        console.log('⚠️ OCR found text but no matching drama in OMDb');
+                    } else {
+                        console.log('⚠️ OCR could not extract text with high confidence');
+                    }
+                } catch (error) {
+                    console.error('OCR extraction failed:', error);
                 }
-                console.log('⚠️ Gemini could not identify drama with high confidence');
             }
 
             // STEP 1: Try filename first (fastest)
