@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { Upload, Sparkles, Film, Search, X, Video, Image as ImageIcon, FileVideo, Zap, ChevronDown, ArrowLeft, Check, Star } from 'lucide-react';
+import { Upload, Sparkles, Film, Search, X, Video, Image as ImageIcon, FileVideo, Zap, ChevronDown, ArrowLeft, Check, Star, Tv, ExternalLink, Loader2 } from 'lucide-react';
 import { detectContent } from '../services/universalDetection';
 import type { UniversalDetectionResult } from '../services/universalDetection';
 import { extractVideoFrames, getFileType } from '../utils/videoProcessor';
 import SmartSearch from '../components/SmartSearch';
+import { fetchWatchProviders, findAndFetchProviders } from '../services/watchProviders';
+import type { StreamingProvider, WatchProvidersResult } from '../services/watchProviders';
+import { PLATFORM_COLORS } from '../services/watchProviders';
 
 export default function CineDetectivePage() {
     const [image, setImage] = useState<string | null>(null);
@@ -738,6 +741,38 @@ function ScanningAnimation({ progress }: { progress: number }) {
 
 // Enhanced Result Display
 function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
+    const [providers, setProviders] = useState<StreamingProvider[]>([]);
+    const [loadingProviders, setLoadingProviders] = useState(true);
+    const [tmdbLink, setTmdbLink] = useState<string | undefined>();
+    const [region, setRegion] = useState<'IN' | 'US'>('IN');
+
+    useEffect(() => {
+        async function fetchProviders() {
+            setLoadingProviders(true);
+            try {
+                let providerResult: WatchProvidersResult;
+
+                if (result.externalIds?.tmdbId) {
+                    // We have TMDB ID — direct fetch
+                    const type = result.type === 'movie' ? 'movie' : 'tv';
+                    providerResult = await fetchWatchProviders(result.externalIds.tmdbId, type, result.title, region);
+                } else {
+                    // No TMDB ID — search by title
+                    providerResult = await findAndFetchProviders(result.title, result.type);
+                }
+
+                setProviders(providerResult.providers);
+                setTmdbLink(providerResult.tmdbLink);
+            } catch (e) {
+                setProviders([]);
+            } finally {
+                setLoadingProviders(false);
+            }
+        }
+
+        fetchProviders();
+    }, [result, region]);
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -844,9 +879,164 @@ function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
                     <span className="font-semibold text-lg">{result.rating}/10</span>
                 </motion.div>
             )}
+
+            {/* ━━━━━━━━━━━━━━━━ WHERE TO WATCH ━━━━━━━━━━━━━━━━ */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="border-t border-white/10 pt-5 mt-2"
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <Tv className="w-5 h-5 text-cyan-400" />
+                        <h3 className="font-bold text-lg text-white">Where to Watch</h3>
+                    </div>
+                    {/* Region Toggle */}
+                    <div className="flex items-center gap-1 bg-slate-800/60 rounded-full p-1 text-xs">
+                        {(['IN', 'US'] as const).map(r => (
+                            <button
+                                key={r}
+                                onClick={() => setRegion(r)}
+                                className={`px-3 py-1 rounded-full font-semibold transition-all ${region === r
+                                    ? 'bg-purple-600 text-white'
+                                    : 'text-gray-400 hover:text-white'
+                                    }`}
+                            >
+                                {r === 'IN' ? '🇮🇳 IN' : '🇺🇸 US'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {loadingProviders ? (
+                    <div className="flex items-center gap-3 text-gray-400 py-3">
+                        <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+                        <span className="text-sm">Finding streaming options...</span>
+                    </div>
+                ) : providers.length > 0 ? (
+                    <div className="space-y-3">
+                        {/* Streaming (flatrate) first */}
+                        {providers.filter(p => p.type === 'flatrate').length > 0 && (
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Stream</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {providers.filter(p => p.type === 'flatrate').map((p, i) => (
+                                        <ProviderBadge key={i} provider={p} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {/* Free */}
+                        {providers.filter(p => p.type === 'free').length > 0 && (
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Free</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {providers.filter(p => p.type === 'free').map((p, i) => (
+                                        <ProviderBadge key={i} provider={p} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {/* Rent/Buy */}
+                        {providers.filter(p => p.type === 'rent' || p.type === 'buy').length > 0 && (
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Rent / Buy</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {providers.filter(p => p.type === 'rent' || p.type === 'buy').map((p, i) => (
+                                        <ProviderBadge key={i} provider={p} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {/* TMDB link */}
+                        {tmdbLink && (
+                            <a
+                                href={tmdbLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 text-xs text-gray-500 hover:text-cyan-400 transition-colors mt-1"
+                            >
+                                <ExternalLink size={12} />
+                                View all options on TMDB
+                            </a>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        <p className="text-sm text-gray-500 italic">
+                            No streaming info found for {region === 'IN' ? 'India' : 'US'}.
+                        </p>
+                        {/* Fallback: search links */}
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                { name: 'Netflix', url: `https://www.netflix.com/search?q=${encodeURIComponent(result.title)}`, color: '#E50914' },
+                                { name: 'Prime Video', url: `https://www.amazon.com/s?k=${encodeURIComponent(result.title)}&i=instant-video`, color: '#00A8E1' },
+                                ...(result.type === 'anime' ? [
+                                    { name: 'Crunchyroll', url: `https://www.crunchyroll.com/search?q=${encodeURIComponent(result.title)}`, color: '#F47521' },
+                                ] : []),
+                                { name: 'Google Search', url: `https://www.google.com/search?q=${encodeURIComponent(result.title + ' where to watch')}`, color: '#4285F4' },
+                            ].map((p, i) => (
+                                <motion.a
+                                    key={i}
+                                    href={p.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white transition-all border border-white/10 hover:border-white/30"
+                                    style={{ backgroundColor: p.color + '22' }}
+                                >
+                                    <span style={{ color: p.color }}>●</span>
+                                    {p.name}
+                                    <ExternalLink size={10} />
+                                </motion.a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </motion.div>
         </motion.div>
     );
 }
+
+// Provider badge component
+function ProviderBadge({ provider }: { provider: StreamingProvider }) {
+    const color = PLATFORM_COLORS[provider.name] || '#6366f1';
+    return (
+        <motion.a
+            href={provider.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            whileHover={{ scale: 1.08, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            title={`Watch on ${provider.name}`}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white transition-all border border-white/10 hover:border-opacity-50 hover:shadow-lg group"
+            style={{
+                backgroundColor: color + '22',
+                borderColor: color + '44',
+            }}
+        >
+            {provider.logo ? (
+                <img
+                    src={provider.logo}
+                    alt={provider.name}
+                    className="w-5 h-5 rounded object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+            ) : (
+                <span
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: color }}
+                />
+            )}
+            <span style={{ color }}>{provider.name}</span>
+            <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color }} />
+        </motion.a>
+    );
+}
+
+
 
 // Enhanced Error Display
 function ErrorDisplay({ error }: { error: string }) {
