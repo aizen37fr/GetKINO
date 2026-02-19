@@ -117,11 +117,41 @@ export async function getAnimeDetails(anilistId: number) {
                 }
                 coverImage {
                     large
-                    medium
+                    extraLarge
                 }
+                bannerImage
                 episodes
+                duration
+                status
                 seasonYear
-                description
+                season
+                description(asHtml: false)
+                genres
+                averageScore
+                popularity
+                studios(isMain: true) {
+                    nodes { name }
+                }
+                characters(role: MAIN, perPage: 6, sort: [ROLE, FAVOURITES_DESC]) {
+                    nodes {
+                        name { full }
+                        image { medium }
+                    }
+                }
+                trailer {
+                    id
+                    site
+                }
+                externalLinks {
+                    site
+                    url
+                    icon
+                    color
+                }
+                nextAiringEpisode {
+                    episode
+                    airingAt
+                }
             }
         }
     `;
@@ -145,6 +175,8 @@ export async function getAnimeDetails(anilistId: number) {
         return null;
     }
 }
+
+
 
 /**
  * Convert File or Blob to base64

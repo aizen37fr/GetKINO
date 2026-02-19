@@ -5,6 +5,7 @@ import { detectContent } from '../services/universalDetection';
 import type { UniversalDetectionResult } from '../services/universalDetection';
 import { extractVideoFrames, getFileType } from '../utils/videoProcessor';
 import SmartSearch from '../components/SmartSearch';
+import { getAnimeDetails } from '../services/tracemoe';
 import { fetchWatchProviders, findAndFetchProviders } from '../services/watchProviders';
 import type { StreamingProvider, WatchProvidersResult } from '../services/watchProviders';
 import { PLATFORM_COLORS } from '../services/watchProviders';
@@ -880,7 +881,40 @@ function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
                 </motion.div>
             )}
 
+            {/* ━━━━━━━━━━ EPISODE & TIMESTAMP (anime detections) ━━━━━━━━━━ */}
+            {(result.episode !== undefined || result.timestamp) && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.45 }}
+                    className="flex flex-wrap gap-2"
+                >
+                    {result.episode !== undefined && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-sm">
+                            <span className="text-purple-300 font-semibold">
+                                {result.season ? `S${result.season} ` : ''}Ep {result.episode}
+                            </span>
+                        </div>
+                    )}
+                    {result.timestamp && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-sm">
+                            <span className="text-cyan-300">⏱</span>
+                            <span className="text-cyan-300 font-semibold font-mono">{result.timestamp}</span>
+                        </div>
+                    )}
+                    {result.year && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700/50 border border-white/10 text-sm">
+                            <span className="text-gray-300">{result.year}</span>
+                        </div>
+                    )}
+                </motion.div>
+            )}
+
+            {/* ━━━━━━━━━━ MORE INFO (expandable details panel) ━━━━━━━━━━ */}
+            <MoreInfoPanel result={result} />
+
             {/* ━━━━━━━━━━━━━━━━ WHERE TO WATCH ━━━━━━━━━━━━━━━━ */}
+
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -996,6 +1030,233 @@ function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
                     </div>
                 )}
             </motion.div>
+        </motion.div>
+    );
+}
+
+// ━━━━━━━━━━━━━━━━ MORE INFO PANEL ━━━━━━━━━━━━━━━━
+function MoreInfoPanel({ result }: { result: UniversalDetectionResult }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [details, setDetails] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleOpen = async () => {
+        setIsOpen(o => !o);
+        if (!details && !loading) {
+            setLoading(true);
+            try {
+                if (result.externalIds?.anilistId) {
+                    const data = await getAnimeDetails(result.externalIds.anilistId);
+                    setDetails(data);
+                }
+            } catch (e) {
+                // ignore
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
+
+    const STREAMING_SITES = ['Crunchyroll', 'Netflix', 'Hulu', 'Funimation', 'Amazon Prime Video', 'HIDIVE', 'Disney Plus', 'Disney+', 'Bilibili', 'VRV', 'AnimeLab'];
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.48 }}
+            className="border border-white/10 rounded-xl overflow-hidden"
+        >
+            <button
+                onClick={handleOpen}
+                className="w-full flex items-center justify-between px-4 py-3 bg-slate-800/40 hover:bg-slate-700/40 transition-colors text-left"
+            >
+                <span className="flex items-center gap-2 font-semibold text-sm text-white">
+                    <span>📖</span> More Info
+                </span>
+                <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                    <ChevronDown size={16} className="text-gray-400" />
+                </motion.span>
+            </button>
+
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="p-4 space-y-4 border-t border-white/5">
+                            {loading ? (
+                                <div className="flex items-center gap-3 text-gray-400 py-2">
+                                    <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                                    <span className="text-sm">Fetching details...</span>
+                                </div>
+                            ) : details ? (
+                                <>
+                                    {/* Description */}
+                                    {details.description && (
+                                        <p className="text-sm text-gray-300 leading-relaxed line-clamp-4">
+                                            {details.description.replace(/<[^>]*>/g, '')}
+                                        </p>
+                                    )}
+
+                                    {/* Meta row */}
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                        {details.status && (
+                                            <span className={`px-2 py-1 rounded-full font-semibold ${details.status === 'FINISHED' ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                                                    : details.status === 'RELEASING' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                                        : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+                                                }`}>
+                                                {details.status === 'FINISHED' ? 'Completed' : details.status === 'RELEASING' ? '🔴 Airing' : details.status}
+                                            </span>
+                                        )}
+                                        {details.episodes && (
+                                            <span className="px-2 py-1 rounded-full bg-slate-700 text-gray-300 border border-white/10">
+                                                {details.episodes} eps
+                                            </span>
+                                        )}
+                                        {details.duration && (
+                                            <span className="px-2 py-1 rounded-full bg-slate-700 text-gray-300 border border-white/10">
+                                                {details.duration} min/ep
+                                            </span>
+                                        )}
+                                        {details.averageScore && (
+                                            <span className="px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                                                ⭐ {(details.averageScore / 10).toFixed(1)}/10
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Genres */}
+                                    {details.genres?.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                            {details.genres.map((g: string) => (
+                                                <span key={g} className="px-2 py-0.5 rounded-full text-xs bg-purple-500/15 text-purple-300 border border-purple-500/20">
+                                                    {g}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Studio */}
+                                    {details.studios?.nodes?.length > 0 && (
+                                        <p className="text-xs text-gray-400">
+                                            <span className="text-gray-500">Studio: </span>
+                                            <span className="text-white font-medium">{details.studios.nodes.map((s: any) => s.name).join(', ')}</span>
+                                        </p>
+                                    )}
+
+                                    {/* Characters */}
+                                    {details.characters?.nodes?.length > 0 && (
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Main Characters</p>
+                                            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                                                {details.characters.nodes.slice(0, 6).map((c: any, i: number) => (
+                                                    <div key={i} className="flex-shrink-0 text-center w-14">
+                                                        {c.image?.medium ? (
+                                                            <img src={c.image.medium} alt={c.name.full}
+                                                                className="w-12 h-12 rounded-full object-cover mx-auto mb-1 border border-white/10" />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-full bg-slate-700 mx-auto mb-1 flex items-center justify-center text-lg">👤</div>
+                                                        )}
+                                                        <p className="text-xxs text-gray-400 text-center leading-tight" style={{ fontSize: '9px' }}>
+                                                            {c.name.full.split(' ')[0]}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Next Airing */}
+                                    {details.nextAiringEpisode && (
+                                        <p className="text-xs text-cyan-400">
+                                            📅 Ep {details.nextAiringEpisode.episode} airs {new Date(details.nextAiringEpisode.airingAt * 1000).toLocaleDateString()}
+                                        </p>
+                                    )}
+
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-wrap gap-2 pt-1">
+                                        {/* AniList link */}
+                                        <a
+                                            href={`https://anilist.co/anime/${result.externalIds?.anilistId}`}
+                                            target="_blank" rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-semibold hover:bg-blue-600/30 transition-colors"
+                                        >
+                                            <ExternalLink size={12} /> View on AniList
+                                        </a>
+                                        {/* Trailer */}
+                                        {details.trailer?.site === 'youtube' && (
+                                            <a
+                                                href={`https://www.youtube.com/watch?v=${details.trailer.id}`}
+                                                target="_blank" rel="noopener noreferrer"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/20 border border-red-500/30 text-red-300 text-xs font-semibold hover:bg-red-600/30 transition-colors"
+                                            >
+                                                ▶ Trailer
+                                            </a>
+                                        )}
+                                        {/* MAL link via imdbId or search */}
+                                        <a
+                                            href={`https://myanimelist.net/search/all?q=${encodeURIComponent(result.title)}`}
+                                            target="_blank" rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-900/20 border border-blue-800/30 text-blue-200 text-xs font-semibold hover:bg-blue-900/30 transition-colors"
+                                        >
+                                            <ExternalLink size={12} /> MyAnimeList
+                                        </a>
+                                    </div>
+
+                                    {/* Streaming links from AniList */}
+                                    {details.externalLinks?.filter((l: any) => STREAMING_SITES.includes(l.site)).length > 0 && (
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Official Streams</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {details.externalLinks
+                                                    .filter((l: any) => STREAMING_SITES.includes(l.site))
+                                                    .map((l: any, i: number) => (
+                                                        <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
+                                                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white transition-all border border-white/10 hover:border-white/25"
+                                                            style={{
+                                                                backgroundColor: (l.color || PLATFORM_COLORS[l.site] || '#6366f1') + '22',
+                                                                borderColor: (l.color || PLATFORM_COLORS[l.site] || '#6366f1') + '44',
+                                                            }}
+                                                        >
+                                                            <span style={{ color: l.color || PLATFORM_COLORS[l.site] || '#a78bfa' }}>●</span>
+                                                            {l.site}
+                                                            <ExternalLink size={10} />
+                                                        </a>
+                                                    ))
+                                                }
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="space-y-3">
+                                    <p className="text-sm text-gray-400">
+                                        {result.overview || 'No additional details available.'}
+                                    </p>
+                                    {result.genres && result.genres.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                            {result.genres.map((g) => (
+                                                <span key={g} className="px-2 py-0.5 rounded-full text-xs bg-purple-500/15 text-purple-300 border border-purple-500/20">{g}</span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <a
+                                        href={`https://www.google.com/search?q=${encodeURIComponent(result.title + ' anime')}`}
+                                        target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 border border-white/10 text-gray-300 text-xs font-semibold hover:bg-slate-600 transition-colors"
+                                    >
+                                        <ExternalLink size={12} /> Search on Google
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 }
