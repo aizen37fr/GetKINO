@@ -145,6 +145,127 @@ function fallbackAnalysis(text: string): GeminiAnalysis {
     };
 }
 
+// ─── Scene-to-Show: Multi-frame analysis ──────────────────────────────────────
+
+/** Richer scene context returned when analyzing a video clip */
+export interface SceneAnalysis {
+    // Show identification
+    showName: string;
+    confidence: number;
+    contentType: 'anime' | 'kdrama' | 'cdrama' | 'series' | 'movie' | 'unknown';
+    alternatives: { showName: string; confidence: number; reason: string }[];
+
+    // Scene-level fingerprint
+    arcName: string | null;          // e.g. "Shibuya Incident Arc" / "Wedding Arc"
+    episodeRange: string | null;     // e.g. "Ep. 112–119" / "Season 2, Ep. 4–7"
+    sceneContext: string;            // e.g. "Rooftop confrontation scene; raining, nighttime"
+    narrativePosition: string | null; // e.g. "Mid-arc climax" / "Season finale"
+    charactersVisible: string[];     // Identified character names
+    keyVisualClues: string[];        // What gave it away ("signature art style", "actor X", "location Y")
+    spoilerLevel: 'low' | 'medium' | 'high'; // How spoilery is this clip
+
+    // Cross-frame meta
+    framesAnalyzed: number;
+    confidence_per_frame: number[];
+    sceneDescription: string;        // Human-readable summary paragraph
+}
+
+/**
+ * Analyze multiple video frames in a single Gemini Vision call.
+ * Works for anime, K-drama, C-drama, Western series, movies — anything.
+ * Returns scene-level fingerprint: arc, episode range, characters, etc.
+ */
+export async function analyzeVideoFrames(
+    framesBase64: { data: string; mimeType: string; timestamp: number }[]
+): Promise<SceneAnalysis | null> {
+    if (!API_KEY) { console.error('Gemini API key not configured'); return null; }
+    if (!framesBase64.length) return null;
+
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        const frameCount = framesBase64.length;
+        const timestamps = framesBase64.map(f => `${f.timestamp.toFixed(1)}s`).join(', ');
+
+        const prompt = `You are KINO Scene Detective — an expert in identifying TV shows, anime, K-dramas, C-dramas, and movies from video frames.
+
+You have been given ${frameCount} frames extracted from a video clip (at timestamps: ${timestamps}).
+
+CONTENT TYPES YOU SUPPORT:
+- Anime (Japanese animation — any studio, any era)
+- K-Drama (Korean live-action series)
+- C-Drama (Chinese/Taiwanese live-action series)  
+- Western series (Netflix, HBO, etc.)
+- Movies (any country, any genre)
+- Indian shows and web series
+
+YOUR TASK: Analyze ALL frames together and:
+1. Identify the show/movie with as much confidence as possible
+2. Pinpoint the EXACT scene context — arc name, episode range, narrative moment
+3. List all recognizable characters and visual clues
+
+Return ONLY valid JSON with this exact structure:
+{
+  "showName": "exact official title",
+  "confidence": 0.92,
+  "contentType": "anime",
+  "alternatives": [
+    { "showName": "alt title", "confidence": 0.4, "reason": "why considered" }
+  ],
+  "arcName": "Shibuya Incident Arc",
+  "episodeRange": "Ep. 112–119",
+  "sceneContext": "Brief description of what is happening in this specific scene",
+  "narrativePosition": "Mid-arc climax — just before the final boss confrontation",
+  "charactersVisible": ["Character A", "Character B"],
+  "keyVisualClues": ["Distinctive school uniform with red trim", "Tokyo skyline backdrop", "Character's signature scar"],
+  "spoilerLevel": "high",
+  "confidence_per_frame": [0.9, 0.88, 0.91],
+  "sceneDescription": "2–3 sentence human-readable summary of what you see and why you identified this show and scene"
+}
+
+RULES:
+- If you cannot determine arcName or episodeRange, use null
+- spoilerLevel: "low" = generic scene, "medium" = plot-relevant, "high" = major plot moment
+- Be SPECIFIC about arcName — use the actual arc/season/story name fans use, not generic ("Season 2")
+- If you see a K-drama, use Korean character names AND romanized names
+- confidence_per_frame should have exactly ${frameCount} values`;
+
+        // Build the content array: prompt + all frames
+        const contentParts: any[] = [{ text: prompt }];
+        for (const frame of framesBase64) {
+            contentParts.push({ inlineData: { mimeType: frame.mimeType, data: frame.data } });
+        }
+
+        const result = await model.generateContent(contentParts);
+        const text = result.response.text();
+        const parsed = parseJSON<any>(text);
+
+        if (!parsed) return null;
+
+        return {
+            showName: parsed.showName || 'Unknown',
+            confidence: parsed.confidence || 0.5,
+            contentType: parsed.contentType || 'unknown',
+            alternatives: parsed.alternatives || [],
+            arcName: parsed.arcName || null,
+            episodeRange: parsed.episodeRange || null,
+            sceneContext: parsed.sceneContext || '',
+            narrativePosition: parsed.narrativePosition || null,
+            charactersVisible: parsed.charactersVisible || [],
+            keyVisualClues: parsed.keyVisualClues || [],
+            spoilerLevel: parsed.spoilerLevel || 'low',
+            framesAnalyzed: frameCount,
+            confidence_per_frame: parsed.confidence_per_frame || [],
+            sceneDescription: parsed.sceneDescription || '',
+        } satisfies SceneAnalysis;
+
+    } catch (error) {
+        console.error('❌ analyzeVideoFrames error:', error);
+        return null;
+    }
+}
+
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── AI DISCOVERY FEATURES ────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════

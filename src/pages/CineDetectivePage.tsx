@@ -13,6 +13,8 @@ import { useAuth } from '../context/AuthContext';
 import type { WatchlistItem, WatchStatus } from '../types/watchlist';
 import { useScanHistory } from '../hooks/useScanHistory';
 import ScanHistoryPanel, { ScanHistoryButton } from '../components/ScanHistoryPanel';
+import { analyzeVideoFrames } from '../services/gemini';
+import type { SceneAnalysis } from '../services/gemini';
 
 export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRabbitHole }: { onOpenWatchlist?: () => void; onOpenAI?: () => void; onOpenRabbitHole?: () => void }) {
 
@@ -26,6 +28,9 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
     const [isVideo, setIsVideo] = useState(false);
     const [videoProgress, setVideoProgress] = useState(0);
     const [showHistory, setShowHistory] = useState(false);
+    const [sceneAnalysis, setSceneAnalysis] = useState<SceneAnalysis | null>(null);
+    const [extractedFrames, setExtractedFrames] = useState<string[]>([]);
+    const [videoPhase, setVideoPhase] = useState<'idle' | 'extracting' | 'analyzing' | 'building'>('idle');
     const currentImageRef = useRef<string | null>(null);
 
     const { history: scanHistory, addScan, removeScan, clearHistory } = useScanHistory();
@@ -79,26 +84,61 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
         try {
             setIsScanning(true);
             setError(null);
+            setSceneAnalysis(null);
+            setExtractedFrames([]);
 
-            setVideoProgress(20);
-            const frames = await extractVideoFrames(file, 2, 5);
+            // Phase 1: Extract frames (up to 8, every 2s)
+            setVideoPhase('extracting');
+            setVideoProgress(15);
+            const frames = await extractVideoFrames(file, 2, 8);
+            setVideoProgress(40);
+
+            if (!frames.length) {
+                setError('❌ Could not extract frames from video');
+                setIsScanning(false);
+                setVideoPhase('idle');
+                return;
+            }
+
+            // Store thumbnail previews
+            setExtractedFrames(frames.map(f => f.dataUrl));
+
+            // Phase 2: Analyze all frames together
+            setVideoPhase('analyzing');
             setVideoProgress(60);
 
-            if (frames.length > 0) {
-                setVideoProgress(80);
+            const framesForGemini = frames.map(f => ({
+                data: f.dataUrl.split(',')[1],
+                mimeType: 'image/jpeg',
+                timestamp: f.timestamp,
+            }));
+
+            const sceneResult = await analyzeVideoFrames(framesForGemini);
+            setVideoProgress(80);
+
+            // Phase 3: Build detection result from scene analysis
+            setVideoPhase('building');
+
+            if (sceneResult) {
+                setSceneAnalysis(sceneResult);
+                // Also run standard scan on first frame for watchlist/streaming data
                 const firstFrameFile = new File([frames[0].blob], 'frame.jpg', { type: 'image/jpeg' });
                 await startScan(firstFrameFile);
             } else {
-                setError('❌ Could not extract frames from video');
-                setIsScanning(false);
+                // Fallback: use first frame with standard detection
+                const firstFrameFile = new File([frames[0].blob], 'frame.jpg', { type: 'image/jpeg' });
+                await startScan(firstFrameFile);
             }
 
             setVideoProgress(100);
+            setVideoPhase('idle');
+
         } catch (error) {
             console.error('Video processing error:', error);
             setError('⚠️ Failed to process video. Please try an image instead.');
             setIsScanning(false);
             setVideoProgress(0);
+            setVideoPhase('idle');
         }
     };
 
@@ -144,6 +184,9 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
         setIsScanning(false);
         setIsVideo(false);
         setVideoProgress(0);
+        setSceneAnalysis(null);
+        setExtractedFrames([]);
+        setVideoPhase('idle');
     };
 
     return (
@@ -668,14 +711,48 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
                                         className="flex flex-col justify-center"
                                     >
                                         {isScanning ? (
-                                            <ScanningAnimation progress={videoProgress} />
+                                            <ScanningAnimation progress={videoProgress} phase={videoPhase} />
                                         ) : result ? (
-                                            <ResultDisplay result={result} />
+                                            <ResultDisplay result={result} sceneAnalysis={sceneAnalysis} />
                                         ) : error ? (
                                             <ErrorDisplay error={error} />
                                         ) : null}
                                     </motion.div>
                                 </div>
+
+                                {/* Frame Timeline Strip */}
+                                {extractedFrames.length > 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="px-8 pb-6"
+                                    >
+                                        <p className="text-xs text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <Film size={12} />
+                                            {extractedFrames.length} frames analyzed
+                                        </p>
+                                        <div className="flex gap-2 overflow-x-auto pb-1">
+                                            {extractedFrames.map((frame, i) => (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ scale: 0, opacity: 0 }}
+                                                    animate={{ scale: 1, opacity: 1 }}
+                                                    transition={{ delay: i * 0.05 }}
+                                                    className="shrink-0 relative"
+                                                >
+                                                    <img
+                                                        src={frame}
+                                                        alt={`Frame ${i + 1}`}
+                                                        className="w-20 h-12 object-cover rounded-lg border border-white/10"
+                                                    />
+                                                    <span className="absolute bottom-1 right-1 text-[8px] bg-black/70 text-white px-1 rounded">
+                                                        {i + 1}
+                                                    </span>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
                             </motion.div>
                         </motion.div>
                     )}
@@ -724,7 +801,24 @@ function FloatingParticles() {
 }
 
 // Enhanced Scanning Animation
-function ScanningAnimation({ progress }: { progress: number }) {
+function ScanningAnimation({ progress, phase }: {
+    progress: number;
+    phase?: 'idle' | 'extracting' | 'analyzing' | 'building';
+}) {
+    const phaseLabel = {
+        idle: 'AI is identifying your content',
+        extracting: '⚙️ Extracting frames from video...',
+        analyzing: '🔍 Analyzing all frames with KINO AI...',
+        building: '🎬 Building scene fingerprint...',
+    }[phase ?? 'idle'];
+
+    const phaseTitle = {
+        idle: 'Analyzing...',
+        extracting: 'Extracting Frames',
+        analyzing: 'Analyzing Clip',
+        building: 'Scene Detective',
+    }[phase ?? 'idle'];
+
     return (
         <div className="text-center py-12">
             <motion.div
@@ -744,20 +838,22 @@ function ScanningAnimation({ progress }: { progress: number }) {
             </motion.div>
 
             <motion.h3
+                key={phaseTitle}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-2xl font-bold mb-2"
             >
-                Analyzing...
+                {phaseTitle}
             </motion.h3>
 
             <motion.p
+                key={phaseLabel}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="text-gray-400 mb-6"
+                transition={{ delay: 0.1 }}
+                className="text-gray-400 mb-6 text-sm"
             >
-                AI is identifying your content
+                {phaseLabel}
             </motion.p>
 
             {progress > 0 && (
@@ -800,7 +896,10 @@ function ScanningAnimation({ progress }: { progress: number }) {
 }
 
 // Enhanced Result Display
-function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
+function ResultDisplay({ result, sceneAnalysis }: {
+    result: UniversalDetectionResult;
+    sceneAnalysis?: import('../services/gemini').SceneAnalysis | null;
+}) {
     const [providers, setProviders] = useState<StreamingProvider[]>([]);
     const [loadingProviders, setLoadingProviders] = useState(true);
     const [tmdbLink, setTmdbLink] = useState<string | undefined>();
@@ -889,6 +988,120 @@ function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
 
             {/* ── ADD TO WATCHLIST button ── */}
             <AddToWatchlistButton result={result} />
+
+            {/* 🎬 Scene Context Panel — only for video clips */}
+            {sceneAnalysis && (
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="mt-4 rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/60 to-purple-950/60 backdrop-blur-sm overflow-hidden"
+                >
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-indigo-500/15">
+                        <div className="flex items-center gap-2">
+                            <Film size={15} className="text-indigo-400" />
+                            <span className="text-sm font-bold text-indigo-300 uppercase tracking-wider">Scene Fingerprint</span>
+                        </div>
+                        {/* Spoiler badge */}
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-widest ${sceneAnalysis.spoilerLevel === 'high' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                                sceneAnalysis.spoilerLevel === 'medium' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                    'bg-green-500/20 text-green-300 border border-green-500/30'
+                            }`}>
+                            {sceneAnalysis.spoilerLevel === 'high' ? '⚠️ High Spoilers' :
+                                sceneAnalysis.spoilerLevel === 'medium' ? '🔶 Some Spoilers' : '✅ Safe to share'}
+                        </span>
+                    </div>
+
+                    <div className="p-5 space-y-4">
+                        {/* Arc & Episode Row */}
+                        <div className="flex flex-wrap gap-3">
+                            {sceneAnalysis.arcName && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/20">
+                                    <span className="text-purple-400 text-xs">🎭 Arc</span>
+                                    <span className="text-white text-sm font-semibold">{sceneAnalysis.arcName}</span>
+                                </div>
+                            )}
+                            {sceneAnalysis.episodeRange && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/15 border border-cyan-500/20">
+                                    <span className="text-cyan-400 text-xs">📺 Episode</span>
+                                    <span className="text-white text-sm font-semibold">{sceneAnalysis.episodeRange}</span>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-700/40 border border-white/10">
+                                <span className="text-gray-400 text-xs">📍 Content Type</span>
+                                <span className="text-white text-sm font-semibold capitalize">{sceneAnalysis.contentType}</span>
+                            </div>
+                        </div>
+
+                        {/* Narrative Position */}
+                        {sceneAnalysis.narrativePosition && (
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Narrative Position</p>
+                                <p className="text-gray-200 text-sm italic">{sceneAnalysis.narrativePosition}</p>
+                            </div>
+                        )}
+
+                        {/* Scene Context */}
+                        {sceneAnalysis.sceneContext && (
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Scene Context</p>
+                                <p className="text-gray-300 text-sm">{sceneAnalysis.sceneContext}</p>
+                            </div>
+                        )}
+
+                        {/* Characters */}
+                        {sceneAnalysis.charactersVisible.length > 0 && (
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Characters Detected</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {sceneAnalysis.charactersVisible.map((char, i) => (
+                                        <span key={i} className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300 text-xs">
+                                            {char}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Visual Clues */}
+                        {sceneAnalysis.keyVisualClues.length > 0 && (
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Key Visual Clues</p>
+                                <ul className="space-y-1">
+                                    {sceneAnalysis.keyVisualClues.slice(0, 4).map((clue, i) => (
+                                        <li key={i} className="text-gray-400 text-xs flex items-start gap-2">
+                                            <span className="text-indigo-400 mt-0.5">•</span>
+                                            {clue}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Frame confidence mini-bar chart */}
+                        {sceneAnalysis.confidence_per_frame.length > 0 && (
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                                    AI Confidence Per Frame ({sceneAnalysis.framesAnalyzed} frames)
+                                </p>
+                                <div className="flex items-end gap-1 h-8">
+                                    {sceneAnalysis.confidence_per_frame.map((c, i) => (
+                                        <motion.div
+                                            key={i}
+                                            initial={{ height: 0 }}
+                                            animate={{ height: `${Math.round(c * 100)}%` }}
+                                            transition={{ delay: i * 0.05 }}
+                                            className="flex-1 rounded-sm bg-gradient-to-t from-indigo-600 to-purple-400"
+                                            title={`Frame ${i + 1}: ${Math.round(c * 100)}%`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </motion.div>
+            )}
 
             {/* Confidence Meter with Animation */}
             {result.confidence && (
