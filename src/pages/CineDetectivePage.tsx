@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { Upload, Sparkles, Film, Search, X, Video, Image as ImageIcon, FileVideo, Zap, ChevronDown, ArrowLeft, Check, Star, Tv, ExternalLink, Loader2 } from 'lucide-react';
+import { Upload, Sparkles, Film, Search, X, Video, Image as ImageIcon, FileVideo, Zap, ChevronDown, ArrowLeft, Check, Star, Tv, ExternalLink, Loader2, Bookmark, BookmarkCheck, Compass } from 'lucide-react';
 import { detectContent } from '../services/universalDetection';
 import type { UniversalDetectionResult } from '../services/universalDetection';
 import { extractVideoFrames, getFileType } from '../utils/videoProcessor';
@@ -9,8 +9,13 @@ import { getAnimeDetails } from '../services/tracemoe';
 import { fetchWatchProviders, findAndFetchProviders } from '../services/watchProviders';
 import type { StreamingProvider, WatchProvidersResult } from '../services/watchProviders';
 import { PLATFORM_COLORS } from '../services/watchProviders';
+import { useAuth } from '../context/AuthContext';
+import type { WatchlistItem, WatchStatus } from '../types/watchlist';
+import { useScanHistory } from '../hooks/useScanHistory';
+import ScanHistoryPanel, { ScanHistoryButton } from '../components/ScanHistoryPanel';
 
-export default function CineDetectivePage() {
+export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRabbitHole }: { onOpenWatchlist?: () => void; onOpenAI?: () => void; onOpenRabbitHole?: () => void }) {
+
     const [image, setImage] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [result, setResult] = useState<UniversalDetectionResult | null>(null);
@@ -20,7 +25,10 @@ export default function CineDetectivePage() {
     const [showManualSearch, setShowManualSearch] = useState(false);
     const [isVideo, setIsVideo] = useState(false);
     const [videoProgress, setVideoProgress] = useState(0);
+    const [showHistory, setShowHistory] = useState(false);
+    const currentImageRef = useRef<string | null>(null);
 
+    const { history: scanHistory, addScan, removeScan, clearHistory } = useScanHistory();
 
     // Parallax effect
     const { scrollY } = useScroll();
@@ -53,6 +61,7 @@ export default function CineDetectivePage() {
         }
 
         const url = URL.createObjectURL(file);
+        currentImageRef.current = url;
         setImage(url);
         setResult(null);
         setError(null);
@@ -104,12 +113,14 @@ export default function CineDetectivePage() {
                 setTimeout(() => {
                     setIsScanning(false);
                     setResult(detectionResult);
+                    addScan(detectionResult, currentImageRef.current ?? undefined, isVideo);
                 }, 2000);
             } else if (detectionResult) {
                 setTimeout(() => {
                     setIsScanning(false);
                     setError('Low confidence match. Result may be inaccurate.');
                     setResult(detectionResult);
+                    addScan(detectionResult, currentImageRef.current ?? undefined, isVideo);
                 }, 2000);
             } else {
                 setTimeout(() => {
@@ -213,6 +224,44 @@ export default function CineDetectivePage() {
                 </motion.div>
 
                 <div className="flex items-center gap-4">
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={onOpenWatchlist}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 transition-colors text-sm font-semibold"
+                    >
+                        <Bookmark size={16} />
+                        <span className="hidden sm:inline">Watchlist</span>
+                    </motion.button>
+
+                    {onOpenAI && (
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={onOpenAI}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600/20 to-cyan-600/20 border border-purple-500/20 text-purple-300 hover:from-purple-600/30 hover:to-cyan-600/30 transition-all text-sm font-semibold shadow-[0_0_15px_rgba(168,85,247,0.15)] hover:shadow-[0_0_25px_rgba(168,85,247,0.3)]"
+                        >
+                            <Sparkles size={16} />
+                            <span className="hidden sm:inline">AI Discovery</span>
+                        </motion.button>
+                    )}
+
+                    {onOpenRabbitHole && (
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={onOpenRabbitHole}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border border-indigo-500/20 text-indigo-300 hover:from-indigo-600/30 hover:to-purple-600/30 transition-all text-sm font-semibold shadow-[0_0_15px_rgba(99,102,241,0.15)] hover:shadow-[0_0_25px_rgba(99,102,241,0.3)]"
+                        >
+                            <Compass size={16} />
+                            <span className="hidden sm:inline">Rabbit Hole</span>
+                        </motion.button>
+                    )}
+
+                    <ScanHistoryButton
+                        onClick={() => setShowHistory(true)}
+                        count={scanHistory.length}
+                    />
                     <motion.button
                         whileHover={{ scale: 1.05, x: -5 }}
                         whileTap={{ scale: 0.95 }}
@@ -631,7 +680,17 @@ export default function CineDetectivePage() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+                {/* ─── Scan History Panel ─── */}
+                <ScanHistoryPanel
+                    isOpen={showHistory}
+                    onClose={() => setShowHistory(false)}
+                    history={scanHistory}
+                    onRemove={removeScan}
+                    onClear={clearHistory}
+                    totalScans={scanHistory.length}
+                />
             </div>
+
         </div>
     );
 }
@@ -828,6 +887,9 @@ function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
                 <p className="text-gray-400">{result.genres?.join(', ') || result.originalTitle || ''}</p>
             </motion.div>
 
+            {/* ── ADD TO WATCHLIST button ── */}
+            <AddToWatchlistButton result={result} />
+
             {/* Confidence Meter with Animation */}
             {result.confidence && (
                 <motion.div
@@ -867,7 +929,6 @@ function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
                     </div>
                 </motion.div>
             )}
-
             {/* Rating */}
             {result.rating && (
                 <motion.div
@@ -1030,6 +1091,109 @@ function ResultDisplay({ result }: { result: UniversalDetectionResult }) {
                     </div>
                 )}
             </motion.div>
+
+        </motion.div>
+
+
+
+    );
+}
+
+// ━━━━━━━━━━━━━━━━ ADD TO WATCHLIST BUTTON ━━━━━━━━━━━━━━━━
+function AddToWatchlistButton({ result }: { result: UniversalDetectionResult }) {
+    const { addToWatchlist, removeFromWatchlist, isInWatchlist, getWatchlistItem } = useAuth();
+    const [showPicker, setShowPicker] = useState(false);
+    const [justAdded, setJustAdded] = useState(false);
+    const inWatchlist = isInWatchlist(result.title);
+    const existing = getWatchlistItem(result.title);
+
+    const statusOptions: { value: WatchStatus; label: string; color: string }[] = [
+        { value: 'plan-to-watch', label: '📋 Plan to Watch', color: '#818cf8' },
+        { value: 'watching', label: '▶️ Watching', color: '#22d3ee' },
+        { value: 'completed', label: '✅ Completed', color: '#4ade80' },
+        { value: 'on-hold', label: '⏸️ On Hold', color: '#fbbf24' },
+        { value: 'dropped', label: '❌ Dropped', color: '#f87171' },
+    ];
+
+    const handleAdd = (status: WatchStatus) => {
+        const item: Omit<WatchlistItem, 'addedAt' | 'updatedAt'> = {
+            id: result.title,
+            title: result.title,
+            type: result.type,
+            image: result.image,
+            year: result.year,
+            genres: result.genres,
+            rating: result.rating,
+            overview: result.overview,
+            externalIds: result.externalIds,
+            status,
+        };
+        addToWatchlist(item);
+        setShowPicker(false);
+        setJustAdded(true);
+        setTimeout(() => setJustAdded(false), 2000);
+    };
+
+    return (
+        <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="relative">
+            {inWatchlist ? (
+                <div className="flex items-center gap-2">
+                    <motion.div
+                        initial={{ scale: 0.8 }}
+                        animate={{ scale: 1 }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/15 border border-green-500/30 text-green-300 text-sm font-semibold"
+                    >
+                        <BookmarkCheck size={16} />
+                        {justAdded ? 'Added!' : `In Watchlist · ${existing?.status?.replace(/-/g, ' ')}`}
+                    </motion.div>
+                    <button
+                        onClick={() => setShowPicker(o => !o)}
+                        className="px-3 py-2 rounded-xl bg-slate-700/60 border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-colors text-xs"
+                    >
+                        Change
+                    </button>
+                    <button
+                        onClick={() => removeFromWatchlist(result.title)}
+                        className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors text-xs"
+                    >
+                        Remove
+                    </button>
+                </div>
+            ) : (
+                <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setShowPicker(o => !o)}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 text-white font-semibold text-sm shadow-lg shadow-purple-900/30 transition-all border border-purple-400/20"
+                >
+                    <Bookmark size={16} />
+                    + Add to Watchlist
+                </motion.button>
+            )}
+
+            {/* Status picker dropdown */}
+            <AnimatePresence>
+                {showPicker && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                        className="absolute top-full left-0 mt-2 w-52 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    >
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider px-3 pt-3 pb-1">Add as…</p>
+                        {statusOptions.map(opt => (
+                            <button
+                                key={opt.value}
+                                onClick={() => handleAdd(opt.value)}
+                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-800 transition-colors flex items-center gap-2"
+                                style={{ color: opt.color }}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 }
@@ -1106,8 +1270,8 @@ function MoreInfoPanel({ result }: { result: UniversalDetectionResult }) {
                                     <div className="flex flex-wrap gap-2 text-xs">
                                         {details.status && (
                                             <span className={`px-2 py-1 rounded-full font-semibold ${details.status === 'FINISHED' ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                                                    : details.status === 'RELEASING' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                                                        : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+                                                : details.status === 'RELEASING' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                                    : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                                                 }`}>
                                                 {details.status === 'FINISHED' ? 'Completed' : details.status === 'RELEASING' ? '🔴 Airing' : details.status}
                                             </span>

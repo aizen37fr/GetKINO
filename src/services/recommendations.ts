@@ -1,4 +1,5 @@
 import type { ContentItem } from '../data/db';
+import type { WatchlistItem } from '../types/watchlist';
 import type { UserProfile, RecommendationResult, SignalScores } from '../types/recommendations';
 import {
     fetchSimilar,
@@ -14,7 +15,7 @@ const IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
  * Main recommendation engine using hybrid multi-signal approach
  */
 export async function getHybridRecommendations(
-    watchlist: ContentItem[],
+    watchlist: WatchlistItem[],
     limit: number = 20
 ): Promise<RecommendationResult[]> {
     if (watchlist.length === 0) {
@@ -51,7 +52,7 @@ export async function getHybridRecommendations(
 /**
  * Build a user profile from their watchlist
  */
-async function buildUserProfile(watchlist: ContentItem[]): Promise<UserProfile> {
+async function buildUserProfile(watchlist: WatchlistItem[]): Promise<UserProfile> {
     const genreCount: Record<string, number> = {};
     const actorCount: Record<string, { name: string; count: number }> = {};
     const directorCount: Record<string, { name: string; count: number }> = {};
@@ -60,7 +61,8 @@ async function buildUserProfile(watchlist: ContentItem[]): Promise<UserProfile> 
 
     for (const item of watchlist) {
         // Count genres
-        item.genres.forEach(genre => {
+        const genres = item.genres || [];
+        genres.forEach((genre: string) => {
             genreCount[genre] = (genreCount[genre] || 0) + 1;
         });
 
@@ -139,7 +141,7 @@ async function buildUserProfile(watchlist: ContentItem[]): Promise<UserProfile> 
 /**
  * Gather candidate content from multiple sources
  */
-async function gatherCandidates(watchlist: ContentItem[]): Promise<any[]> {
+async function gatherCandidates(watchlist: WatchlistItem[]): Promise<any[]> {
     const candidateMap = new Map<string, any>();
 
     for (const item of watchlist.slice(0, 5)) { // Limit to top 5 to avoid rate limits

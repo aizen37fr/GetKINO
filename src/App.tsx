@@ -4,25 +4,48 @@ import AuthPage from './pages/Auth';
 import LandingPage from './pages/LandingPage';
 import CineDetectivePage from './pages/CineDetectivePage';
 import MatchMode from './pages/MatchMode';
+import WatchlistPage from './pages/WatchlistPage';
+import TasteDNAPage from './pages/TasteDNAPage';
+import AIDiscoveryPage from './pages/AIDiscoveryPage';
+import RabbitHolePage from './pages/RabbitHolePage';
 import AIChatbot from './components/AIChatbot';
+
+
 // import { ParticleBackground } from './components/3D/ParticleBackground';
 // import { CursorEffect } from './components/3D/CursorEffect';
 
+type Page = 'landing' | 'detective' | 'match' | 'watchlist' | 'tasteDNA' | 'aiDiscovery' | 'rabbitHole';
+
+
+
 function AppContent() {
   const { user } = useAuth();
-  const [currentPage, setCurrentPage] = useState<'landing' | 'detective' | 'match'>('landing');
+  const [currentPage, setCurrentPage] = useState<Page>('landing');
 
-  // Landing Page - Al ways show first (for both logged in and not logged in users)
   if (currentPage === 'landing') {
     return <LandingPage onGetStarted={() => setCurrentPage('detective')} />;
   }
 
-  // Auth required for other pages
   if (!user) {
     return <AuthPage />;
   }
 
-  // Match Mode
+  if (currentPage === 'watchlist') {
+    return <WatchlistPage onBack={() => setCurrentPage('detective')} onOpenDNA={() => setCurrentPage('tasteDNA')} />;
+  }
+
+  if (currentPage === 'tasteDNA') {
+    return <TasteDNAPage onBack={() => setCurrentPage('watchlist')} />;
+  }
+
+  if (currentPage === 'aiDiscovery') {
+    return <AIDiscoveryPage onBack={() => setCurrentPage('detective')} />;
+  }
+
+  if (currentPage === 'rabbitHole') {
+    return <RabbitHolePage onBack={() => setCurrentPage('detective')} />;
+  }
+
   if (currentPage === 'match') {
     return (
       <>
@@ -32,26 +55,28 @@ function AppContent() {
     );
   }
 
-  // Detective Page - Main app experience
+  // Detective Page — pass navigation so it can open Watchlist
   return (
     <>
-      <CineDetectivePage />
+      <CineDetectivePage
+        onOpenWatchlist={() => setCurrentPage('watchlist')}
+        onOpenAI={() => setCurrentPage('aiDiscovery')}
+        onOpenRabbitHole={() => setCurrentPage('rabbitHole')}
+      />
       <AIChatbot />
     </>
   );
+
 }
 
 function App() {
   return (
     <AuthProvider>
-      {/* 3D Background Effects */}
       {/* <ParticleBackground theme="default" /> */}
       {/* <CursorEffect /> */}
-
       <AppContent />
     </AuthProvider>
   );
 }
 
-export default App
-
+export default App;

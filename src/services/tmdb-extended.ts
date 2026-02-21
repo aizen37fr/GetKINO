@@ -107,3 +107,77 @@ export function extractTMDBId(contentId: string): { id: number; type: 'movie' | 
         type: match[1] === 'm' ? 'movie' : 'tv'
     };
 }
+
+// Search TMDB for movies and TV shows by query
+export async function searchTMDB(query: string): Promise<{ id: number; title: string; type: 'movie' | 'tv'; posterPath: string | null; rating: number; year: string }[]> {
+    if (!API_KEY || !query.trim()) return [];
+    try {
+        const url = `${BASE_URL}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=en-US&page=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+        return (data.results || [])
+            .filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv')
+            .slice(0, 8)
+            .map((r: any) => ({
+                id: r.id,
+                title: r.title || r.name,
+                type: r.media_type as 'movie' | 'tv',
+                posterPath: r.poster_path,
+                rating: r.vote_average || 0,
+                year: (r.release_date || r.first_air_date || '').slice(0, 4),
+            }));
+    } catch (err) {
+        console.error('searchTMDB error:', err);
+        return [];
+    }
+}
+
+// Fetch top 3 cast members for rabbit hole connections
+export async function fetchTopCast(tmdbId: number, type: 'movie' | 'tv'): Promise<{ id: number; name: string; character: string; profilePath: string | null }[]> {
+    if (!API_KEY) return [];
+    try {
+        const url = `${BASE_URL}/${type}/${tmdbId}/credits?api_key=${API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        return (data.cast || []).slice(0, 3).map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            character: a.character,
+            profilePath: a.profile_path,
+        }));
+    } catch (err) {
+        console.error('fetchTopCast error:', err);
+        return [];
+    }
+}
+
+// Fetch movies/shows by a person (actor or director)
+export async function fetchByPerson(personId: number, personType: 'cast' | 'crew'): Promise<any[]> {
+    if (!API_KEY) return [];
+    try {
+        const url = `${BASE_URL}/person/${personId}/combined_credits?api_key=${API_KEY}&language=en-US`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const items = personType === 'cast' ? (data.cast || []) : (data.crew || []).filter((c: any) => c.job === 'Director');
+        return items
+            .filter((i: any) => i.poster_path && i.vote_average > 6)
+            .sort((a: any, b: any) => b.popularity - a.popularity)
+            .slice(0, 5);
+    } catch (err) {
+        console.error('fetchByPerson error:', err);
+        return [];
+    }
+}
+
+// Fetch full details of a single movie or show
+export async function fetchDetails(tmdbId: number, type: 'movie' | 'tv'): Promise<any | null> {
+    if (!API_KEY) return null;
+    try {
+        const url = `${BASE_URL}/${type}/${tmdbId}?api_key=${API_KEY}&language=en-US`;
+        const res = await fetch(url);
+        return await res.json();
+    } catch (err) {
+        console.error('fetchDetails error:', err);
+        return null;
+    }
+}

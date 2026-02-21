@@ -111,8 +111,18 @@ export default function CylinderDeck({ items, onClose, onSwipe }: CylinderDeckPr
         }
 
         if (dir === 'like') {
-            addToWatchlist(items[activeIndex]);
-            // Visual feedback could be added here
+            const item = items[activeIndex];
+            addToWatchlist({
+                id: item.id,
+                title: item.title,
+                type: item.type === 'kdrama' || item.type === 'cdrama' ? 'tv' : item.type as 'anime' | 'movie' | 'tv' | 'series',
+                image: item.image,
+                year: item.year,
+                genres: item.genres,
+                rating: item.rating,
+                overview: item.description,
+                status: 'plan-to-watch',
+            });
         }
 
         // Rotate to next

@@ -1,4 +1,4 @@
-import type { ContentItem } from '../data/db';
+import type { WatchlistItem } from '../types/watchlist';
 
 export interface DNATrait {
     label: string;
@@ -39,7 +39,7 @@ const SPIRIT_ANIMALS = [
     { threshold: 'Imagination', animal: 'Unicorn', emoji: '🦄', tagline: 'Dreamer' },
 ];
 
-export function calculateReelDNA(watchlist: ContentItem[]): DNAProfile {
+export function calculateReelDNA(watchlist: WatchlistItem[]): DNAProfile {
     if (watchlist.length === 0) {
         return {
             traits: [],
@@ -59,7 +59,8 @@ export function calculateReelDNA(watchlist: ContentItem[]): DNAProfile {
     let totalItems = 0;
 
     watchlist.forEach(item => {
-        item.genres.forEach(g => {
+        const genres = item.genres || [];
+        genres.forEach((g: string) => {
             const trait = TRAITS_MAP[g] || 'Adrenaline'; // Default fallback
             // Add weighted score based on rating if available, else 1
             traitScores[trait] += item.rating ? item.rating / 2 : 5;
