@@ -2,11 +2,40 @@ import type { ContentItem, Mood, Language } from '../data/db';
 
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
+// Image base URL for posters
 const IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
-// Use proxy for TMDB requests to bypass network restrictions
-const USE_PROXY = true;
-const PROXY_BASE = '/api/tmdb';
+/**
+ * Helper to fetch from TMDB via proxy in production, or direct in development.
+ */
+async function fetchViaProxy(endpointPath: string, params: Record<string, string | number | boolean> = {}) {
+    const isProd = import.meta.env.PROD;
+    const PROXY_BASE = '/api/tmdb';
+
+    if (isProd) {
+        // Build URL relative to the app origin
+        const url = new URL(PROXY_BASE, window.location.origin);
+        url.searchParams.set('endpoint', endpointPath);
+        Object.entries(params).forEach(([k, v]) => {
+            if (v !== undefined) url.searchParams.set(k, String(v));
+        });
+
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`TMDB Proxy error: ${res.status}`);
+        return res.json();
+    } else {
+        // Fallback for local development
+        const url = new URL(`${BASE_URL}${endpointPath}`);
+        url.searchParams.set('api_key', API_KEY || '');
+        Object.entries(params).forEach(([k, v]) => {
+            if (v !== undefined) url.searchParams.set(k, String(v));
+        });
+
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`Direct TMDB error: ${res.status}`);
+        return res.json();
+    }
+}
 
 // Mapping Moods to TMDB Genre IDs
 const MOOD_GENRES: Record<Mood, number[]> = {
@@ -53,16 +82,17 @@ export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Lang
     const langCode = LANG_MAP[language];
 
     // Discover endpoint offers rich filtering
-    let url = `${BASE_URL}/discover/${type}?api_key=${API_KEY}&language=en-US&with_original_language=${langCode}&with_genres=${genreIds}&sort_by=popularity.desc&include_adult=false&page=1`;
-
-    // Add Streaming Provider Filter (Region: IN for India relevance)
-    if (providerId) {
-        url += `&with_watch_providers=${providerId}&watch_region=IN`;
-    }
-
     try {
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy(`/discover/${type}`, {
+            language: 'en-US',
+            with_original_language: langCode,
+            with_genres: genreIds,
+            sort_by: 'popularity.desc',
+            include_adult: 'false',
+            page: 1,
+            with_watch_providers: providerId || '',
+            watch_region: 'IN'
+        });
 
         if (!data.results) return [];
 
@@ -73,44 +103,50 @@ export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Lang
 
         const detailedPromises = topResults.map(async (item: any) => {
             // 1. Fetch Details (Videos + Providers + Credits)
-            const detailUrl = `${BASE_URL}/${type}/${item.id}?api_key=${API_KEY}&append_to_response=videos,watch/providers,credits`;
-            const detailRes = await fetch(detailUrl);
-            const detailData = await detailRes.json();
+            try {
+                const detailData = await fetchViaProxy(`/${type}/${item.id}`, {
+                    append_to_response: 'videos,watch/providers,credits'
+                });
 
-            // Extract Trailer
-            const trailer = detailData.videos?.results?.find(
-                (v: any) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')
-            );
+                // Extract Trailer
+                const trailer = detailData.videos?.results?.find(
+                    (v: any) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')
+                );
 
-            // Extract US Providers (Flatrate / Stream)
-            const providers = detailData['watch/providers']?.results?.US?.flatrate?.slice(0, 3).map((p: any) => ({
-                name: p.provider_name,
-                logo: `${IMAGE_BASE}${p.logo_path}`,
-                link: detailData['watch/providers']?.results?.US?.link // This is usually a general link
-            })) || [];
+                // Extract US Providers (Flatrate / Stream)
+                const providers = detailData['watch/providers']?.results?.US?.flatrate?.slice(0, 3).map((p: any) => ({
+                    name: p.provider_name,
+                    logo: `${IMAGE_BASE}${p.logo_path}`,
+                    link: detailData['watch/providers']?.results?.US?.link // This is usually a general link
+                })) || [];
 
-            return {
-                id: `${type === 'movie' ? 'm' : 's'}-${item.id}`,
-                title: item.title || item.name,
-                type: type === 'movie' ? 'movie' : 'series',
-                moods: [mood],
-                genres: item.genre_ids ? item.genre_ids.map((id: number) => GENRE_ID_MAP[id] || 'Unknown') : [],
-                language: language,
-                rating: item.vote_average,
-                year: new Date(item.release_date || item.first_air_date).getFullYear() || 0,
-                image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : '',
-                description: item.overview,
-                trailerKey: trailer?.key,
-                watchProviders: providers,
-                cast: detailData.credits?.cast?.slice(0, 6).map((c: any) => ({
-                    name: c.name,
-                    character: c.character,
-                    image: c.profile_path ? `${IMAGE_BASE}${c.profile_path}` : null
-                })) || []
-            };
+                return {
+                    id: `${type === 'movie' ? 'm' : 's'}-${item.id}`,
+                    title: item.title || item.name,
+                    type: type === 'movie' ? 'movie' : 'series',
+                    moods: [mood],
+                    genres: item.genre_ids ? item.genre_ids.map((id: number) => GENRE_ID_MAP[id] || 'Unknown') : [],
+                    language: language,
+                    rating: item.vote_average,
+                    year: new Date(item.release_date || item.first_air_date).getFullYear() || 0,
+                    image: item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : '',
+                    description: item.overview,
+                    trailerKey: trailer?.key,
+                    watchProviders: providers,
+                    cast: detailData.credits?.cast?.slice(0, 6).map((c: any) => ({
+                        name: c.name,
+                        character: c.character,
+                        image: c.profile_path ? `${IMAGE_BASE}${c.profile_path}` : null
+                    })) || []
+                };
+            } catch (err) {
+                console.error(`Error fetching details for ${item.id}:`, err);
+                return null;
+            }
         });
 
-        return Promise.all(detailedPromises);
+        const results = await Promise.all(detailedPromises);
+        return results.filter(Boolean) as ContentItem[];
 
     } catch (error) {
         console.error("TMDB Fetch Error:", error);
@@ -122,24 +158,16 @@ export async function fetchTMDB(type: 'movie' | 'tv', mood: Mood, language: Lang
  * Search movies by title
  */
 export async function searchMoviesByTitle(title: string) {
-    if (!API_KEY) return [];
-
     try {
-        let url: string;
-
-        if (USE_PROXY) {
-            // Use serverless proxy to bypass network restrictions
-            url = `${PROXY_BASE}?endpoint=/search/movie&query=${encodeURIComponent(title)}&include_adult=false`;
-        } else {
-            // Direct API call
-            url = `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(title)}&include_adult=false`;
-        }
-
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await fetchViaProxy('/search/movie', {
+            query: title,
+            language: 'en-US',
+            page: 1,
+            include_adult: 'false'
+        });
         return data.results || [];
     } catch (error) {
-        console.error('TMDB movie search error:', error);
+        console.error("TMDB movie search error:", error);
         return [];
     }
 }
@@ -148,24 +176,16 @@ export async function searchMoviesByTitle(title: string) {
  * Search TV shows by title
  */
 export async function searchTVByTitle(title: string) {
-    if (!API_KEY) return [];
-
     try {
-        let url: string;
-
-        if (USE_PROXY) {
-            // Use serverless proxy to bypass network restrictions
-            url = `${PROXY_BASE}?endpoint=/search/tv&query=${encodeURIComponent(title)}&include_adult=false`;
-        } else {
-            // Direct API call
-            url = `${BASE_URL}/search/tv?api_key=${API_KEY}&query=${encodeURIComponent(title)}&include_adult=false`;
-        }
-
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await fetchViaProxy('/search/tv', {
+            query: title,
+            language: 'en-US',
+            page: 1,
+            include_adult: 'false'
+        });
         return data.results || [];
     } catch (error) {
-        console.error('TMDB TV search error:', error);
+        console.error("TMDB TV search error:", error);
         return [];
     }
 }

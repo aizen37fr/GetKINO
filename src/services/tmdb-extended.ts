@@ -5,12 +5,8 @@ const BASE_URL = 'https://api.themoviedb.org/3';
 
 // Fetch similar content
 export async function fetchSimilar(tmdbId: number, type: 'movie' | 'tv'): Promise<any[]> {
-    if (!API_KEY) return [];
-
     try {
-        const url = `${BASE_URL}/${type}/${tmdbId}/similar?api_key=${API_KEY}&language=en-US&page=1`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy(`/${type}/${tmdbId}/similar`, { language: 'en-US', page: 1 });
         return data.results || [];
     } catch (err) {
         console.error('Error fetching similar:', err);
@@ -20,12 +16,8 @@ export async function fetchSimilar(tmdbId: number, type: 'movie' | 'tv'): Promis
 
 // Fetch TMDB recommendations
 export async function fetchRecommendations(tmdbId: number, type: 'movie' | 'tv'): Promise<any[]> {
-    if (!API_KEY) return [];
-
     try {
-        const url = `${BASE_URL}/${type}/${tmdbId}/recommendations?api_key=${API_KEY}&language=en-US&page=1`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy(`/${type}/${tmdbId}/recommendations`, { language: 'en-US', page: 1 });
         return data.results || [];
     } catch (err) {
         console.error('Error fetching recommendations:', err);
@@ -35,12 +27,8 @@ export async function fetchRecommendations(tmdbId: number, type: 'movie' | 'tv')
 
 // Fetch credits (cast & crew)
 export async function fetchCredits(tmdbId: number, type: 'movie' | 'tv'): Promise<{ cast: any[]; crew: any[] }> {
-    if (!API_KEY) return { cast: [], crew: [] };
-
     try {
-        const url = `${BASE_URL}/${type}/${tmdbId}/credits?api_key=${API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy(`/${type}/${tmdbId}/credits`);
         return {
             cast: data.cast || [],
             crew: data.crew || []
@@ -53,12 +41,8 @@ export async function fetchCredits(tmdbId: number, type: 'movie' | 'tv'): Promis
 
 // Fetch keywords
 export async function fetchKeywords(tmdbId: number, type: 'movie' | 'tv'): Promise<any[]> {
-    if (!API_KEY) return [];
-
     try {
-        const url = `${BASE_URL}/${type}/${tmdbId}/keywords?api_key=${API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy(`/${type}/${tmdbId}/keywords`);
         return type === 'movie' ? (data.keywords || []) : (data.results || []);
     } catch (err) {
         console.error('Error fetching keywords:', err);
@@ -68,12 +52,12 @@ export async function fetchKeywords(tmdbId: number, type: 'movie' | 'tv'): Promi
 
 // Fetch content by actor
 export async function fetchByActor(actorId: number): Promise<any[]> {
-    if (!API_KEY) return [];
-
     try {
-        const url = `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_cast=${actorId}&sort_by=popularity.desc&page=1`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy('/discover/movie', {
+            with_cast: actorId,
+            sort_by: 'popularity.desc',
+            page: 1
+        });
         return data.results || [];
     } catch (err) {
         console.error('Error fetching by actor:', err);
@@ -83,12 +67,12 @@ export async function fetchByActor(actorId: number): Promise<any[]> {
 
 // Fetch content by director
 export async function fetchByDirector(directorId: number): Promise<any[]> {
-    if (!API_KEY) return [];
-
     try {
-        const url = `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_crew=${directorId}&sort_by=popularity.desc&page=1`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy('/discover/movie', {
+            with_crew: directorId,
+            sort_by: 'popularity.desc',
+            page: 1
+        });
         return data.results || [];
     } catch (err) {
         console.error('Error fetching by director:', err);
@@ -98,23 +82,54 @@ export async function fetchByDirector(directorId: number): Promise<any[]> {
 
 // Helper to extract TMDB ID from content ID
 export function extractTMDBId(contentId: string): { id: number; type: 'movie' | 'tv' } | null {
-    // contentId format: "m-123" for movies, "s-456" for series
     const match = contentId.match(/^([ms])-(\d+)$/);
     if (!match) return null;
-
     return {
         id: parseInt(match[2]),
         type: match[1] === 'm' ? 'movie' : 'tv'
     };
 }
 
+/**
+ * Enhanced fetcher that uses the Vercel proxy (/api/tmdb) in production
+ * or direct TMDB calls in local development.
+ */
+async function fetchViaProxy(endpoint: string, params: Record<string, string | number | boolean> = {}) {
+    // In production (Vercel), usually /api/...
+    // In local dev, we might need direct TMDB unless vercel dev is used
+    const isProd = import.meta.env.PROD;
+
+    if (isProd) {
+        const url = new URL('/api/tmdb', window.location.origin);
+        url.searchParams.set('endpoint', endpoint);
+        Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`Proxy error: ${res.status}`);
+        return res.json();
+    } else {
+        // Fallback for local dev
+        const url = new URL(`${BASE_URL}${endpoint}`);
+        url.searchParams.set('api_key', API_KEY || '');
+        Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`Direct TMDB error: ${res.status}`);
+        return res.json();
+    }
+}
+
 // Search TMDB for movies and TV shows by query
 export async function searchTMDB(query: string): Promise<{ id: number; title: string; type: 'movie' | 'tv'; posterPath: string | null; rating: number; year: string }[]> {
-    if (!API_KEY || !query.trim()) return [];
+    if (!query.trim()) return [];
     try {
-        const url = `${BASE_URL}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=en-US&page=1`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy('/search/multi', {
+            query: query,
+            language: 'en-US',
+            page: 1,
+            include_adult: 'false'
+        });
+
         return (data.results || [])
             .filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv')
             .slice(0, 8)
@@ -134,11 +149,8 @@ export async function searchTMDB(query: string): Promise<{ id: number; title: st
 
 // Fetch top 3 cast members for rabbit hole connections
 export async function fetchTopCast(tmdbId: number, type: 'movie' | 'tv'): Promise<{ id: number; name: string; character: string; profilePath: string | null }[]> {
-    if (!API_KEY) return [];
     try {
-        const url = `${BASE_URL}/${type}/${tmdbId}/credits?api_key=${API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy(`/${type}/${tmdbId}/credits`);
         return (data.cast || []).slice(0, 3).map((a: any) => ({
             id: a.id,
             name: a.name,
@@ -153,11 +165,8 @@ export async function fetchTopCast(tmdbId: number, type: 'movie' | 'tv'): Promis
 
 // Fetch movies/shows by a person (actor or director)
 export async function fetchByPerson(personId: number, personType: 'cast' | 'crew'): Promise<any[]> {
-    if (!API_KEY) return [];
     try {
-        const url = `${BASE_URL}/person/${personId}/combined_credits?api_key=${API_KEY}&language=en-US`;
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetchViaProxy(`/person/${personId}/combined_credits`, { language: 'en-US' });
         const items = personType === 'cast' ? (data.cast || []) : (data.crew || []).filter((c: any) => c.job === 'Director');
         return items
             .filter((i: any) => i.poster_path && i.vote_average > 6)
@@ -171,11 +180,8 @@ export async function fetchByPerson(personId: number, personType: 'cast' | 'crew
 
 // Fetch full details of a single movie or show
 export async function fetchDetails(tmdbId: number, type: 'movie' | 'tv'): Promise<any | null> {
-    if (!API_KEY) return null;
     try {
-        const url = `${BASE_URL}/${type}/${tmdbId}?api_key=${API_KEY}&language=en-US`;
-        const res = await fetch(url);
-        return await res.json();
+        return await fetchViaProxy(`/${type}/${tmdbId}`, { language: 'en-US' });
     } catch (err) {
         console.error('fetchDetails error:', err);
         return null;
