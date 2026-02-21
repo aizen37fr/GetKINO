@@ -31,8 +31,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(500).json({ error: 'TMDB API key not configured' });
         }
 
-        // Build the TMDB URL
-        const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+        // Build the TMDB URL (ensure no double slashes)
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+        const url = new URL(`${TMDB_BASE_URL}/${cleanEndpoint}`);
 
         // Add any additional query parameters (but NOT api_key)
         Object.entries(queryParams).forEach(([key, value]) => {
