@@ -15,6 +15,7 @@ import { useScanHistory } from '../hooks/useScanHistory';
 import ScanHistoryPanel, { ScanHistoryButton } from '../components/ScanHistoryPanel';
 import { analyzeVideoFrames } from '../services/gemini';
 import type { SceneAnalysis } from '../services/gemini';
+import { searchTMDB } from '../services/tmdb-extended';
 
 export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRabbitHole }: { onOpenWatchlist?: () => void; onOpenAI?: () => void; onOpenRabbitHole?: () => void }) {
 
@@ -103,7 +104,7 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
             // Store thumbnail previews
             setExtractedFrames(frames.map(f => f.dataUrl));
 
-            // Phase 2: Analyze all frames together
+            // Phase 2: Analyze all frames together with Gemini Vision
             setVideoPhase('analyzing');
             setVideoProgress(60);
 
@@ -119,13 +120,47 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
             // Phase 3: Build detection result from scene analysis
             setVideoPhase('building');
 
-            if (sceneResult) {
+            if (sceneResult && sceneResult.confidence >= 0.45 && sceneResult.showName !== 'Unknown') {
+                // ✅ Gemini identified the show — use TMDB search to get accurate metadata
                 setSceneAnalysis(sceneResult);
-                // Also run standard scan on first frame for watchlist/streaming data
-                const firstFrameFile = new File([frames[0].blob], 'frame.jpg', { type: 'image/jpeg' });
-                await startScan(firstFrameFile);
+                setVideoProgress(85);
+
+                const tmdbHits = await searchTMDB(sceneResult.showName);
+                if (tmdbHits.length > 0) {
+                    const top = tmdbHits[0];
+                    const posterUrl = top.posterPath
+                        ? `https://image.tmdb.org/t/p/w500${top.posterPath}`
+                        : null;
+
+                    const detectionResult: UniversalDetectionResult = {
+                        title: top.title,
+                        originalTitle: sceneResult.showName,
+                        confidence: sceneResult.confidence,
+                        type: top.type === 'movie' ? 'movie' : 'series',
+                        year: top.year ? parseInt(top.year) : undefined,
+                        image: posterUrl || undefined,
+                        rating: top.rating ? parseFloat(top.rating.toFixed(1)) : undefined,
+                        genres: [],
+                        description: sceneResult.sceneDescription || undefined,
+                        tmdbId: `${top.type === 'movie' ? 'm' : 's'}-${top.id}`,
+                        source: 'tmdb',
+                    } as UniversalDetectionResult;
+
+                    setVideoProgress(100);
+                    setVideoPhase('idle');
+                    setTimeout(() => {
+                        setIsScanning(false);
+                        setResult(detectionResult);
+                        addScan(detectionResult, currentImageRef.current ?? undefined, isVideo);
+                    }, 500);
+                } else {
+                    // TMDB found nothing — fall back to single-frame scan with hint
+                    const firstFrameFile = new File([frames[0].blob], 'frame.jpg', { type: 'image/jpeg' });
+                    await startScan(firstFrameFile);
+                }
             } else {
-                // Fallback: use first frame with standard detection
+                // Gemini uncertain or returned Unknown — fall back to single-frame detection
+                if (sceneResult) setSceneAnalysis(sceneResult);
                 const firstFrameFile = new File([frames[0].blob], 'frame.jpg', { type: 'image/jpeg' });
                 await startScan(firstFrameFile);
             }
@@ -1005,8 +1040,8 @@ function ResultDisplay({ result, sceneAnalysis }: {
                         </div>
                         {/* Spoiler badge */}
                         <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-widest ${sceneAnalysis.spoilerLevel === 'high' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
-                                sceneAnalysis.spoilerLevel === 'medium' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                                    'bg-green-500/20 text-green-300 border border-green-500/30'
+                            sceneAnalysis.spoilerLevel === 'medium' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                'bg-green-500/20 text-green-300 border border-green-500/30'
                             }`}>
                             {sceneAnalysis.spoilerLevel === 'high' ? '⚠️ High Spoilers' :
                                 sceneAnalysis.spoilerLevel === 'medium' ? '🔶 Some Spoilers' : '✅ Safe to share'}

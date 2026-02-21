@@ -187,48 +187,61 @@ export async function analyzeVideoFrames(
         const frameCount = framesBase64.length;
         const timestamps = framesBase64.map(f => `${f.timestamp.toFixed(1)}s`).join(', ');
 
-        const prompt = `You are KINO Scene Detective — an expert in identifying TV shows, anime, K-dramas, C-dramas, and movies from video frames.
+        const prompt = `You are KINO Scene Detective — an expert AI that identifies anime, K-dramas, C-dramas, live-action series, and movies from video frames.
 
-You have been given ${frameCount} frames extracted from a video clip (at timestamps: ${timestamps}).
+You have ${frameCount} frames extracted from a video clip (timestamps: ${timestamps}).
 
-CONTENT TYPES YOU SUPPORT:
-- Anime (Japanese animation — any studio, any era)
-- K-Drama (Korean live-action series)
-- C-Drama (Chinese/Taiwanese live-action series)  
-- Western series (Netflix, HBO, etc.)
-- Movies (any country, any genre)
-- Indian shows and web series
+═══ CRITICAL RULES — READ THESE FIRST ═══
+1. DO NOT GUESS. If you are not reasonably sure, set confidence below 0.5 and showName to "Unknown".
+2. NEVER fabricate a wrong title with high confidence. Wrong title at high confidence is WORSE than "Unknown".
+3. Use ALL frames together — consistency across frames increases confidence.
+4. A title you haven't seen before in training is NOT a reason to pick another show — say "Unknown".
 
-YOUR TASK: Analyze ALL frames together and:
-1. Identify the show/movie with as much confidence as possible
-2. Pinpoint the EXACT scene context — arc name, episode range, narrative moment
-3. List all recognizable characters and visual clues
+═══ ANIME RECOGNITION SIGNALS (HIGHEST PRIORITY) ═══
+Look for these FIRST when frames appear to be animation:
+• Naruto: orange jumpsuit, whisker marks on cheeks, headband, chakra effects, Hidden Leaf/Sand/Mist village symbols, Sharingan/Rinnegan eyes, specific character hair (Naruto's spiky yellow hair, Sasuke's dark hair, Kakashi's silver hair + mask, Sakura's pink hair)
+• One Piece: extreme body proportions, Luffy's straw hat + red vest, Zoro's 3-sword style, Nami's navigator tools, specific Devil Fruit powers
+• Attack on Titan: 3DMG gear with gas canisters and blades, titan bodies, Survey Corps green cloaks with wings-of-freedom insignia
+• Demon Slayer: specific breath technique colors (blue for water, orange/red for flame), checkered haori patterns (Tanjiro's green/black, Zenitsu's yellow, Inosuke's boar head)
+• Dragon Ball: energy auras, Ki blasts, Saiyan armor, specific transformations (Super Saiyan golden hair, SSB blue)
+• Jujutsu Kaisen: cursed energy black/purple effects, Gojo's infinity blindfold, Tokyo/Kyoto school uniforms
+• My Hero Academia: hero costumes, Quirk visual effects, U.A. uniform
+• Bleach: shinigami robes and zanpakutō, hollow masks, Soul Society architecture
+• For OTHER anime: identify art studio style, character design conventions, setting, visual effects
 
-Return ONLY valid JSON with this exact structure:
+═══ LIVE-ACTION RECOGNITION SIGNALS ═══
+• K-Drama: Korean actors, Korean signage/text, Korean urban/rural settings, K-pop aesthetics
+• C-Drama: Chinese text, Chinese historical costumes (hanfu), wuxia/xianxia effects
+• Western shows: recognize by actor faces, production design, show-specific visual language
+
+═══ YOUR TASK ═══
+Analyze ALL provided frames together and return ONLY valid JSON:
+
 {
-  "showName": "exact official title",
-  "confidence": 0.92,
+  "showName": "exact official title (or 'Unknown' if unsure)",
+  "confidence": 0.0,
   "contentType": "anime",
   "alternatives": [
-    { "showName": "alt title", "confidence": 0.4, "reason": "why considered" }
+    { "showName": "alt title", "confidence": 0.3, "reason": "brief reason" }
   ],
-  "arcName": "Shibuya Incident Arc",
-  "episodeRange": "Ep. 112–119",
-  "sceneContext": "Brief description of what is happening in this specific scene",
-  "narrativePosition": "Mid-arc climax — just before the final boss confrontation",
+  "arcName": "exact arc name fans use (or null)",
+  "episodeRange": "e.g. Ep. 112-119 (or null)",
+  "sceneContext": "what is happening in this scene",
+  "narrativePosition": "e.g. Mid-arc climax (or null)",
   "charactersVisible": ["Character A", "Character B"],
-  "keyVisualClues": ["Distinctive school uniform with red trim", "Tokyo skyline backdrop", "Character's signature scar"],
-  "spoilerLevel": "high",
-  "confidence_per_frame": [0.9, 0.88, 0.91],
-  "sceneDescription": "2–3 sentence human-readable summary of what you see and why you identified this show and scene"
+  "keyVisualClues": ["Naruto's whisker marks", "orange jumpsuit", "Rasengan energy"],
+  "spoilerLevel": "low",
+  "confidence_per_frame": [0.9, 0.88],
+  "sceneDescription": "2-3 sentence summary of what you see and your reasoning"
 }
 
-RULES:
-- If you cannot determine arcName or episodeRange, use null
-- spoilerLevel: "low" = generic scene, "medium" = plot-relevant, "high" = major plot moment
-- Be SPECIFIC about arcName — use the actual arc/season/story name fans use, not generic ("Season 2")
-- If you see a K-drama, use Korean character names AND romanized names
-- confidence_per_frame should have exactly ${frameCount} values`;
+CONFIDENCE GUIDE:
+• 0.9-1.0 = You are absolutely certain — multiple unmistakable visual identifiers match
+• 0.7-0.9 = Very confident — strong art style + character + setting match
+• 0.5-0.7 = Moderate — some visual clues match but not definitive
+• below 0.5 = Uncertain — set showName to "Unknown"
+
+confidence_per_frame must have exactly ${frameCount} values.`;
 
         // Build the content array: prompt + all frames
         const contentParts: any[] = [{ text: prompt }];
