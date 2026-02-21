@@ -153,7 +153,7 @@ export default function SwipeDeck({ items, onClose }: SwipeDeckProps) {
         const item = cards[cards.length - 1];
 
         if (dir === 'like') {
-            addToWatchlist(item);
+            addToWatchlist({ ...item, status: 'plan-to-watch', type: (item.type === 'kdrama' || item.type === 'cdrama' ? 'tv' : item.type) as 'anime' | 'movie' | 'tv' | 'series' });
             setExitDirection(1);
         } else {
             setExitDirection(-1);
@@ -256,7 +256,7 @@ export default function SwipeDeck({ items, onClose }: SwipeDeckProps) {
                     <X size={32} strokeWidth={3} />
                 </button>
                 <button
-                    onClick={() => { if (cards.length) addToWatchlist(cards[cards.length - 1]); }}
+                    onClick={() => { if (cards.length) { const c = cards[cards.length - 1]; addToWatchlist({ ...c, status: 'plan-to-watch', type: (c.type === 'kdrama' || c.type === 'cdrama' ? 'tv' : c.type) as 'anime' | 'movie' | 'tv' | 'series' }); } }}
                     className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border-2 border-blue-400 text-blue-400 flex items-center justify-center hover:bg-blue-400 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-lg shadow-blue-900/20" aria-label="Super Like">
                     <Star size={24} fill="currentColor" />
                 </button>

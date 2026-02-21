@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Sparkles, Search, Sun, Zap, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Sparkles, Search, Sun, Zap, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { topGenres as calcTopGenres } from '../utils/tasteDNA';
 import {
