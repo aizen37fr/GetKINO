@@ -270,7 +270,9 @@ export default function RabbitHolePage({ onBack, seedTmdbId, seedType }: RabbitH
     const [query, setQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Awaited<ReturnType<typeof searchTMDB>>>([]);
     const [searching, setSearching] = useState(false);
+    const [searchDone, setSearchDone] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const searchBarRef = useRef<HTMLDivElement>(null);
 
     // Depth counter
     const maxDepth = graph.nodes.filter(n => n.isExpanded).length;
@@ -298,14 +300,34 @@ export default function RabbitHolePage({ onBack, seedTmdbId, seedType }: RabbitH
     // ── Search ──────────────────────────────────────────────────────────────
     const onQueryChange = (val: string) => {
         setQuery(val);
+        setSearchDone(false);
         clearTimeout(searchTimeout.current);
         if (!val.trim()) { setSearchResults([]); return; }
         searchTimeout.current = setTimeout(async () => {
             setSearching(true);
             const res = await searchTMDB(val);
             setSearchResults(res);
+            setSearchDone(true);
             setSearching(false);
         }, 400);
+    };
+
+    const onSearchSelect = (id: number, type: 'movie' | 'tv') => {
+        seedGraph(id, type);
+        setSearchDone(false);
+    };
+
+    // Dropdown position from ref
+    const getDropdownStyle = () => {
+        if (!searchBarRef.current) return {};
+        const rect = searchBarRef.current.getBoundingClientRect();
+        return {
+            position: 'fixed' as const,
+            top: rect.bottom + 8,
+            left: rect.left,
+            width: rect.width,
+            zIndex: 9999,
+        };
     };
 
     const seedGraph = useCallback(async (tmdbId: number, type: 'movie' | 'tv') => {
@@ -392,31 +414,37 @@ export default function RabbitHolePage({ onBack, seedTmdbId, seedType }: RabbitH
                 </div>
 
                 {/* Search */}
-                <div className="flex-1 max-w-lg relative ml-4">
+                <div className="flex-1 max-w-lg relative ml-4" ref={searchBarRef}>
                     <div className="flex items-center gap-3 bg-white/8 border border-white/12 rounded-2xl px-4 py-2.5">
                         {searching ? <Loader2 size={16} className="text-purple-400 animate-spin shrink-0" /> : <Search size={16} className="text-gray-400 shrink-0" />}
                         <input
                             value={query}
                             onChange={e => onQueryChange(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && searchResults.length > 0) {
+                                    onSearchSelect(searchResults[0].id, searchResults[0].type);
+                                }
+                            }}
                             placeholder="Search any movie or show to start..."
                             className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-500"
                         />
-                        {query && <button onClick={() => { setQuery(''); setSearchResults([]); }} className="text-gray-500 hover:text-white"><X size={14} /></button>}
+                        {query && <button onClick={() => { setQuery(''); setSearchResults([]); setSearchDone(false); }} className="text-gray-500 hover:text-white"><X size={14} /></button>}
                     </div>
 
-                    {/* Dropdown */}
+                    {/* Dropdown — rendered as fixed to escape overflow clipping */}
                     <AnimatePresence>
-                        {searchResults.length > 0 && (
+                        {query.trim() && (searchResults.length > 0 || searchDone) && (
                             <motion.div
                                 initial={{ opacity: 0, y: -8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -8 }}
-                                className="absolute top-full mt-2 left-0 right-0 bg-[#0d0d1a] border border-white/15 rounded-2xl overflow-hidden shadow-2xl z-50"
+                                style={getDropdownStyle()}
+                                className="bg-[#0d0d1a] border border-white/15 rounded-2xl overflow-hidden shadow-2xl"
                             >
-                                {searchResults.map(r => (
+                                {searchResults.length > 0 ? searchResults.map(r => (
                                     <button
                                         key={r.id}
-                                        onClick={() => seedGraph(r.id, r.type)}
+                                        onClick={() => onSearchSelect(r.id, r.type)}
                                         className="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/8 transition-colors text-left"
                                     >
                                         {r.posterPath ? (
@@ -432,7 +460,11 @@ export default function RabbitHolePage({ onBack, seedTmdbId, seedType }: RabbitH
                                         </div>
                                         <Compass size={14} className="text-purple-400 shrink-0 ml-auto" />
                                     </button>
-                                ))}
+                                )) : (
+                                    <div className="px-4 py-5 text-center text-sm text-gray-500">
+                                        No results for "{query}" — try another title
+                                    </div>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
