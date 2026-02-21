@@ -41,15 +41,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        console.log('Proxying TMDB request:', url.toString());
+        // Add api_key as query param (v3 auth - works with standard API key)
+        url.searchParams.set('api_key', API_KEY!);
 
-        // Fetch from TMDB using Bearer token authentication
-        const response = await fetch(url.toString(), {
-            headers: {
-                'Authorization': `Bearer ${API_KEY}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        console.log('Proxying TMDB request:', url.pathname);
+
+        // Fetch from TMDB
+        const response = await fetch(url.toString());
         const data = await response.json();
 
         if (!response.ok) {
