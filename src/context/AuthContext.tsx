@@ -67,9 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => subscription.unsubscribe();
     }, []);
 
-    // Sync Watchlist to LocalStorage
+    // Sync Watchlist to LocalStorage safely
     useEffect(() => {
-        localStorage.setItem('wtw_watchlist_v2', JSON.stringify(watchlist));
+        try {
+            localStorage.setItem('wtw_watchlist_v2', JSON.stringify(watchlist));
+        } catch (error) {
+            console.error("Failed to save watchlist to localStorage:", error);
+        }
     }, [watchlist]);
 
     const signIn = async (username: string, pass: string) => {
