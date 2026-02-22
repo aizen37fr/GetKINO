@@ -42,8 +42,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        // Clean the key just in case the user pasted "Bearer " into the env var
-        const cleanApiKey = API_KEY!.replace(/^Bearer\s+/i, '').trim();
+        // Clean the key just in case the user pasted "Bearer " or quotes into the env var
+        const cleanApiKey = API_KEY!.replace(/^Bearer\s+/i, '').replace(/['"]/g, '').trim();
         const isV4Token = cleanApiKey.length > 50;
 
         const headers: Record<string, string> = {
