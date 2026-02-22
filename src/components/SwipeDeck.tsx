@@ -72,7 +72,7 @@ const SwipeCard = forwardRef(({ item, index, isTop, onSwipe, onDetails }: {
                 })
             }}
             custom={0} // Default value
-            className="absolute inset-0 w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-surface cursor-grab active:cursor-grabbing border border-white/10"
+            className="gpu-accelerated absolute inset-0 w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-surface cursor-grab active:cursor-grabbing border border-white/10"
         >
             {/* Image */}
             <div className="absolute inset-0">
@@ -96,15 +96,15 @@ const SwipeCard = forwardRef(({ item, index, isTop, onSwipe, onDetails }: {
             <div className="absolute bottom-0 left-0 right-0 p-6 z-10 text-white">
                 <div className="flex justify-between items-end mb-2">
                     <h2 className="text-3xl font-bold leading-tight drop-shadow-md">{item.title}</h2>
-                    <div className="flex items-center gap-1 bg-yellow-500/20 backdrop-blur-md px-2 py-1 rounded-lg text-yellow-400 font-bold border border-yellow-500/30">
+                    <div className="flex items-center gap-1 bg-yellow-500/30 md:bg-yellow-500/20 md:backdrop-blur-md px-2 py-1 rounded-lg text-yellow-400 font-bold border border-yellow-500/30">
                         <Star size={16} fill="currentColor" />
                         <span>{item.rating}</span>
                     </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-4 text-sm font-medium">
-                    <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">{item.year}</span>
-                    <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">{item.language}</span>
+                    <span className="bg-white/20 px-3 py-1 rounded-full">{item.year}</span>
+                    <span className="bg-white/20 px-3 py-1 rounded-full">{item.language}</span>
                     {item.genres.slice(0, 2).map(g => (
                         <span key={g} className="bg-primary/80 px-3 py-1 rounded-full">{g}</span>
                     ))}
@@ -117,7 +117,7 @@ const SwipeCard = forwardRef(({ item, index, isTop, onSwipe, onDetails }: {
                 <div className="flex gap-3 mt-4">
                     <button
                         onClick={(e) => { e.stopPropagation(); onDetails(item); }}
-                        className="flex-1 bg-white/10 hover:bg-white/20 backdrop-blur-md py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
+                        className="flex-1 bg-white/20 hover:bg-white/30 md:bg-white/10 md:hover:bg-white/20 md:backdrop-blur-md py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
                     >
                         <Info size={18} /> Details
                     </button>
@@ -127,7 +127,7 @@ const SwipeCard = forwardRef(({ item, index, isTop, onSwipe, onDetails }: {
                             const link = item.trailerUrl || `https://www.youtube.com/results?search_query=${item.title}+trailer`;
                             window.open(link, '_blank');
                         }}
-                        className="w-12 bg-red-600 hover:bg-red-700 backdrop-blur-md rounded-xl flex items-center justify-center transition-colors"
+                        className="w-12 bg-red-600 hover:bg-red-700 md:backdrop-blur-md rounded-xl flex items-center justify-center transition-colors shadow-lg shadow-red-900/40"
                     >
                         <Play size={18} fill="white" />
                     </button>

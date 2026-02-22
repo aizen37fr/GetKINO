@@ -32,6 +32,15 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* Mobile Animation Performance */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+}
+
 @keyframes pulse-ring {
   0% {
     transform: scale(0.8);

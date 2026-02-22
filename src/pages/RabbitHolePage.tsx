@@ -211,7 +211,7 @@ function NodeCard({ node, isHovered, onHover, onLeave, onClick }: {
                 cursor: node.isExpanded ? 'default' : 'pointer',
                 boxShadow: isHovered ? `0 0 28px 6px ${glowColor}` : `0 0 10px 2px ${glowColor}`,
             }}
-            className={`rounded-xl overflow-visible border transition-all duration-300 ${node.isSeed
+            className={`gpu-accelerated rounded-xl overflow-visible border transition-all duration-300 ${node.isSeed
                 ? 'border-purple-500 ring-2 ring-purple-400/40 scale-125'
                 : isHovered
                     ? 'border-white/60 scale-110'
@@ -234,7 +234,7 @@ function NodeCard({ node, isHovered, onHover, onLeave, onClick }: {
                     <div className="absolute top-1 right-1 w-3 h-3 bg-purple-500 rounded-full animate-pulse" />
                 )}
                 {!node.isExpanded && !node.isSeed && (
-                    <div className="absolute top-1 left-1 w-3 h-3 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center">
+                    <div className="absolute top-1 left-1 w-3 h-3 bg-white/20 md:bg-white/10 md:backdrop-blur-sm rounded-full flex items-center justify-center">
                         <Plus size={8} className="text-white/60" />
                     </div>
                 )}
@@ -399,7 +399,7 @@ export default function RabbitHolePage({ onBack, seedTmdbId, seedType }: RabbitH
         <div className="fixed inset-0 bg-[#05050f] text-white overflow-hidden flex flex-col" style={{ fontFamily: "'Inter', sans-serif" }}>
 
             {/* ── Header ── */}
-            <div className="shrink-0 flex items-center gap-4 px-6 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md z-30">
+            <div className="shrink-0 flex items-center gap-4 px-6 py-4 border-b border-white/10 bg-black/80 md:bg-black/40 md:backdrop-blur-md z-30">
                 <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
                     <ChevronLeft size={20} />
                 </button>
