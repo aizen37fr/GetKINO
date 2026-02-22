@@ -42,17 +42,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        const isV4Token = API_KEY!.length > 50;
+        // Clean the key just in case the user pasted "Bearer " into the env var
+        const cleanApiKey = API_KEY!.replace(/^Bearer\s+/i, '').trim();
+        const isV4Token = cleanApiKey.length > 50;
+
         const headers: Record<string, string> = {
             'Content-Type': 'application/json'
         };
 
         if (isV4Token) {
             // v4 Auth Token (JWT) - use Bearer header
-            headers['Authorization'] = `Bearer ${API_KEY}`;
+            headers['Authorization'] = `Bearer ${cleanApiKey}`;
         } else {
             // v3 API Key (32 chars) - use query param
-            url.searchParams.set('api_key', API_KEY!);
+            url.searchParams.set('api_key', cleanApiKey);
         }
 
         console.log(`Proxying TMDB request (Auth: ${isV4Token ? 'v4 Bearer' : 'v3 API Key'}):`, url.pathname);
