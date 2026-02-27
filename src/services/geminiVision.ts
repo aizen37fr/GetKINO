@@ -50,7 +50,7 @@ export async function identifyDramaFromImage(imageUrl: string): Promise<GeminiRe
         const base64Image = await imageToBase64(imageUrl);
 
         // Use Gemini 1.5 Flash Latest for vision
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }, { apiVersion: 'v1' });
 
         const prompt = `Analyze this image and identify if it's from a Korean drama (K-drama) or Chinese drama (C-drama).
 

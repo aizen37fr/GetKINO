@@ -15,7 +15,7 @@ const genAI = new GoogleGenerativeAI(API_KEY || '');
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 function textModel() {
-    return genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    return genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }, { apiVersion: 'v1' });
 }
 
 async function askGemini(prompt: string): Promise<string> {
@@ -68,7 +68,7 @@ export async function analyzeWithGemini(imageFile: File): Promise<GeminiAnalysis
         console.log('🤖 Gemini: Analyzing image...');
         const base64 = await fileToBase64(imageFile);
         const base64Data = base64.split(',')[1];
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-pro' }, { apiVersion: 'v1' });
 
         const prompt = `Analyze this screenshot from a TV show or movie. Provide detailed information and your TOP 3 MOST LIKELY MATCHES.
 
@@ -187,7 +187,7 @@ export async function analyzeVideoFrames(
     if (!framesBase64.length) return null;
 
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }, { apiVersion: 'v1' });
 
         const frameCount = framesBase64.length;
         const timestamps = framesBase64.map(f => `${f.timestamp.toFixed(1)}s`).join(', ');
