@@ -19,8 +19,13 @@ function textModel() {
 }
 
 async function askGemini(prompt: string): Promise<string> {
-    const result = await textModel().generateContent(prompt);
-    return result.response.text();
+    try {
+        const result = await textModel().generateContent(prompt);
+        return result.response.text();
+    } catch (e: any) {
+        alert("Gemini Error: " + (e.message || "Unknown error"));
+        throw e;
+    }
 }
 
 function parseJSON<T>(text: string): T | null {
