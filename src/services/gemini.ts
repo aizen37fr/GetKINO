@@ -15,7 +15,7 @@ const genAI = new GoogleGenerativeAI(API_KEY || '');
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 function textModel() {
-    return genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    return genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 }
 
 async function askGemini(prompt: string): Promise<string> {
@@ -187,7 +187,7 @@ export async function analyzeVideoFrames(
     if (!framesBase64.length) return null;
 
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
         const frameCount = framesBase64.length;
         const timestamps = framesBase64.map(f => `${f.timestamp.toFixed(1)}s`).join(', ');
