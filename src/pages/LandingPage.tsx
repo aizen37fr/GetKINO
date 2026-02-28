@@ -11,9 +11,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
     const { scrollY } = useScroll();
     const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
     const heroScale = useTransform(scrollY, [0, 300], [1, 0.8]);
-    const { user, logout } = useAuth();
-    const [showAuthModal, setShowAuthModal] = useState(false);
-    const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-black text-white overflow-hidden">
@@ -66,75 +64,17 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 </motion.div>
 
                 <div className="flex items-center gap-4">
-                    {user ? (
-                        <>
-                            <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full"
-                            >
-                                <User size={18} className="text-purple-400" />
-                                <span className="text-sm">{user.name}</span>
-                            </motion.div>
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={onGetStarted}
-                                className="px-6 py-3 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 bg-size-200 bg-pos-0 hover:bg-pos-100 rounded-full font-bold shadow-lg shadow-purple-500/50 transition-all duration-300 flex items-center gap-2"
-                            >
-                                Get Started
-                                <ArrowRight size={18} />
-                            </motion.button>
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={logout}
-                                className="px-6 py-2 text-gray-300 hover:text-white transition-colors flex items-center gap-2"
-                            >
-                                <LogOut size={18} />
-                                <span className="hidden md:inline">Logout</span>
-                            </motion.button>
-                        </>
-                    ) : (
-                        <>
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => {
-                                    setAuthMode('login');
-                                    setShowAuthModal(true);
-                                }}
-                                className="px-6 py-2 text-gray-300 hover:text-white transition-colors flex items-center gap-2"
-                            >
-                                <LogIn size={18} />
-                                Login
-                            </motion.button>
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => {
-                                    setAuthMode('signup');
-                                    setShowAuthModal(true);
-                                }}
-                                className="px-6 py-3 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 bg-size-200 bg-pos-0 hover:bg-pos-100 rounded-full font-bold shadow-lg shadow-purple-500/50 transition-all duration-300 flex items-center gap-2"
-                            >
-                                <UserPlus size={18} />
-                                Sign Up
-                            </motion.button>
-                        </>
-                    )}
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={onGetStarted}
+                        className="px-6 py-3 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 bg-size-200 bg-pos-0 hover:bg-pos-100 rounded-full font-bold shadow-lg shadow-purple-500/50 transition-all duration-300 flex items-center gap-2"
+                    >
+                        Get Started
+                        <ArrowRight size={18} />
+                    </motion.button>
                 </div>
             </motion.nav>
-
-            {/* Auth Modal */}
-            <AnimatePresence>
-                {showAuthModal && (
-                    <AuthModal
-                        mode={authMode}
-                        onClose={() => setShowAuthModal(false)}
-                        onSwitchMode={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                    />
-                )}
-            </AnimatePresence>
 
             {/* Hero Section */}
             <motion.section

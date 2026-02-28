@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import AuthPage from './pages/Auth';
+import { AuthProvider } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
 import CineDetectivePage from './pages/CineDetectivePage';
 import MatchMode from './pages/MatchMode';
@@ -19,16 +18,16 @@ type Page = 'landing' | 'detective' | 'match' | 'watchlist' | 'tasteDNA' | 'aiDi
 
 
 function AppContent() {
-  const { user } = useAuth();
+  // const { user } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('landing');
 
   if (currentPage === 'landing') {
     return <LandingPage onGetStarted={() => setCurrentPage('detective')} />;
   }
 
-  if (!user) {
-    return <AuthPage />;
-  }
+  // if (!user) {
+  //   return <AuthPage />;
+  // }
 
   if (currentPage === 'watchlist') {
     return <WatchlistPage onBack={() => setCurrentPage('detective')} onOpenDNA={() => setCurrentPage('tasteDNA')} />;
