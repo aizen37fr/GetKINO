@@ -1,31 +1,50 @@
 /**
- * Google Gemini AI Service
+ * AI Service — powered by Groq (llama-3.3-70b) for text + Gemini for vision
  * Vision analysis + 7 AI-powered discovery features
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// ─── Groq (text AI) ───────────────────────────────────────────────────────────
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-if (!API_KEY) {
-    console.warn('⚠️ Gemini API key not found');
+if (!GROQ_API_KEY) {
+    console.warn('⚠️ Groq API key not found. Set VITE_GROQ_API_KEY in Vercel env vars.');
 }
 
-const genAI = new GoogleGenerativeAI(API_KEY || '');
+// ─── Gemini (vision only, optional) ──────────────────────────────────────────
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(GEMINI_KEY || '');
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
-function textModel() {
-    return genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }, { apiVersion: 'v1' });
-}
+// Alias for vision code below
+const API_KEY = GEMINI_KEY;
 
+// ─── Core text helper: Groq ───────────────────────────────────────────────────
 async function askGemini(prompt: string): Promise<string> {
-    try {
-        const result = await textModel().generateContent(prompt);
-        return result.response.text();
-    } catch (e: any) {
-        alert("Gemini Error: " + (e.message || "Unknown error"));
-        throw e;
+    if (!GROQ_API_KEY) throw new Error('Groq API key not configured. Add VITE_GROQ_API_KEY to Vercel.');
+
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+            model: GROQ_MODEL,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 2048,
+        }),
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Groq API error ${res.status}: ${err}`);
     }
+
+    const data = await res.json();
+    return data.choices[0].message.content as string;
 }
 
 function parseJSON<T>(text: string): T | null {
@@ -36,6 +55,7 @@ function parseJSON<T>(text: string): T | null {
         return null;
     }
 }
+
 
 // ─── Vision types ─────────────────────────────────────────────────────────────
 export interface MatchCandidate {
