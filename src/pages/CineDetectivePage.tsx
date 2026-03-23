@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { Upload, Sparkles, Film, Search, X, Video, Image as ImageIcon, FileVideo, Zap, ChevronDown, ArrowLeft, Check, Star, Tv, ExternalLink, Loader2, Bookmark, BookmarkCheck, Compass } from 'lucide-react';
 import { detectContent } from '../services/universalDetection';
@@ -16,6 +16,9 @@ import ScanHistoryPanel, { ScanHistoryButton } from '../components/ScanHistoryPa
 import { detectFromFrames } from '../services/reelDetector';
 import type { SceneAnalysis } from '../services/gemini';
 import { searchTMDB } from '../services/tmdb-extended';
+import { BatchProcessor } from '../utils/batchProcessor';
+import type { BatchJob, BatchProgress } from '../utils/batchProcessor';
+import BatchResults from '../components/BatchResults';
 
 export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRabbitHole, onOpenReelDetector }: { onOpenWatchlist?: () => void; onOpenAI?: () => void; onOpenRabbitHole?: () => void; onOpenReelDetector?: () => void }) {
 
@@ -34,6 +37,12 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
     const [videoPhase, setVideoPhase] = useState<'idle' | 'extracting' | 'analyzing' | 'building'>('idle');
     const currentImageRef = useRef<string | null>(null);
 
+    // Batch processing state
+    const [isBatchMode, setBatchMode] = useState(false);
+    const [batchJobs, setBatchJobs] = useState<BatchJob[]>([]);
+    const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
+    const batchProcessor = useMemo(() => new BatchProcessor(), []);
+
     const { history: scanHistory, addScan, removeScan, clearHistory } = useScanHistory();
 
     // Parallax effect
@@ -46,16 +55,50 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
         e.preventDefault();
         setIsDragging(false);
         const files = Array.from(e.dataTransfer.files);
-        if (files.length > 0) {
+        if (files.length > 1) {
+            processBatch(files);
+        } else if (files.length === 1) {
+            setBatchMode(false);
             processFile(files[0]);
         }
     };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        if (files.length > 0) {
+        if (files.length > 1) {
+            processBatch(files);
+        } else if (files.length === 1) {
+            setBatchMode(false);
             processFile(files[0]);
         }
+    };
+
+    const processBatch = async (files: File[]) => {
+        setBatchMode(true);
+        setImage(null);
+        setResult(null);
+        setError(null);
+        setBatchJobs([]);
+        setBatchProgress(null);
+        
+        const jobs = await batchProcessor.processBatch(
+            files,
+            contentType,
+            (progress) => setBatchProgress(progress),
+            (job) => {
+                setBatchJobs(prev => {
+                    const index = prev.findIndex(j => j.id === job.id);
+                    if (index >= 0) {
+                        const newJobs = [...prev];
+                        newJobs[index] = job;
+                        return newJobs;
+                    }
+                    return [...prev, job];
+                });
+            }
+        );
+        
+        setBatchJobs(jobs);
     };
 
     const processFile = async (file: File) => {
@@ -455,7 +498,7 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
 
                 {/* Main Upload Area or Results */}
                 <AnimatePresence mode="wait">
-                    {!image && !result ? (
+                    {!image && !result && !isBatchMode ? (
                         <motion.div
                             key="upload"
                             initial={{ opacity: 0, scale: 0.9 }}
@@ -578,6 +621,7 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
                                     <input
                                         type="file"
                                         accept="image/*,video/*"
+                                        multiple
                                         onChange={handleFileSelect}
                                         className="hidden"
                                         id="file-upload"
@@ -675,6 +719,47 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
                                     )}
                                 </AnimatePresence>
                             </motion.div>
+                        </motion.div>
+                    ) : isBatchMode ? (
+                        <motion.div
+                            key="batch-results"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ type: "spring", stiffness: 100 }}
+                            className="max-w-5xl mx-auto space-y-6"
+                        >
+                            {batchProgress && batchProgress.percentage < 100 && (
+                                <div className="bg-slate-900/50 border border-purple-500/30 rounded-2xl p-6 backdrop-blur-xl mb-8">
+                                    <div className="flex justify-between text-sm mb-2">
+                                        <span className="text-purple-300 font-medium">Processing Batch...</span>
+                                        <span className="text-purple-400 font-bold">{batchProgress.percentage}%</span>
+                                    </div>
+                                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                        <motion.div
+                                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${batchProgress.percentage}%` }}
+                                            transition={{ duration: 0.3 }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-500 mt-2">
+                                        <span>{batchProgress.completed} done</span>
+                                        <span>{batchProgress.failed} failed</span>
+                                        <span>{batchProgress.total} total</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <BatchResults
+                                jobs={batchJobs}
+                                onRemoveJob={(id) => setBatchJobs(prev => prev.filter(j => j.id !== id))}
+                                onClearAll={() => {
+                                    batchProcessor.clear();
+                                    setBatchMode(false);
+                                    setBatchJobs([]);
+                                }}
+                            />
                         </motion.div>
                     ) : (
                         <motion.div
