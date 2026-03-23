@@ -7,13 +7,14 @@ import WatchlistPage from './pages/WatchlistPage';
 import TasteDNAPage from './pages/TasteDNAPage';
 import AIDiscoveryPage from './pages/AIDiscoveryPage';
 import RabbitHolePage from './pages/RabbitHolePage';
+import ReelDetectorPage from './pages/ReelDetectorPage';
 import AIChatbot from './components/AIChatbot';
 
 
 // import { ParticleBackground } from './components/3D/ParticleBackground';
 // import { CursorEffect } from './components/3D/CursorEffect';
 
-type Page = 'landing' | 'detective' | 'match' | 'watchlist' | 'tasteDNA' | 'aiDiscovery' | 'rabbitHole';
+type Page = 'landing' | 'detective' | 'match' | 'watchlist' | 'tasteDNA' | 'aiDiscovery' | 'rabbitHole' | 'reelDetector';
 
 
 
@@ -43,6 +44,10 @@ function AppContent() {
 
   if (currentPage === 'rabbitHole') {
     return <RabbitHolePage onBack={() => setCurrentPage('detective')} />;
+  }
+
+  if (currentPage === 'reelDetector') {
+    return <ReelDetectorPage onBack={() => setCurrentPage('detective')} />;
   }
 
   if (currentPage === 'match') {
