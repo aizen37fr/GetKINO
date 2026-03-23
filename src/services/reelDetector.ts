@@ -46,33 +46,59 @@ async function analyzeFrame(base64Image: string, mimeType: string): Promise<stri
                         },
                         {
                             type: 'text',
-                            text: `You are KINO's Scene Detective. Identify the TV show, anime, movie, or drama in this frame.
+                            text: `You are KINO Scene Detective. Identify the TV show, anime, movie, or drama from this frame.
 
-Look for: character faces, costumes, art style, text/subtitles, Korean/Japanese/Chinese text, visual effects, setting, actor faces.
+═══ CONFIDENCE RULES — READ CAREFULLY ═══
+ONLY give high confidence (0.8+) if you see:
+- Visible title/logo text of the show on screen
+- Subtitles that include the show or character name
+- A VERY distinctive and unique costume/setting that only ONE show has
+- An actor face you recognize with CERTAINTY (not just resemblance)
 
-Return ONLY valid JSON:
+Give MEDIUM confidence (0.5-0.79) for:
+- Recognizable art style + costume combo
+- Korean/Japanese/Chinese setting with some matching elements
+- General resemblance to a known show but not certain
+
+Give LOW confidence (0.3-0.49) if:
+- You're making an educated guess based on general aesthetics
+- The scene looks like it COULD be from many different shows
+- You see Korean/Japanese content but can't identify the specific title
+
+DO NOT give 0.8+ confidence just because you see:
+- Korean subtitles (ALL K-dramas have these)
+- "Actor face" without certainty (many actors look similar)
+- Generic restaurant/cafe/school/city settings
+- Standard costumes that appear in hundreds of shows
+
+Always provide 3 alternatives even if you're very confident.
+
+Return ONLY valid JSON with NO extra text:
 {
   "title": "exact official title or 'Unknown'",
-  "confidence": 0.85,
+  "confidence": 0.65,
   "type": "kdrama",
-  "episode": "Ep 7 Season 2 (or null)",
-  "characters": ["character name if recognizable"],
-  "visualClues": ["what gave it away", "e.g. Korean subtitles", "actor face", "specific costume"],
-  "sceneDescription": "one sentence describing what's happening",
-  "alternatives": [{"title": "possible alt", "confidence": 0.4}],
+  "episode": "Ep 7 Season 2 or null",
+  "characters": ["character name if you are CERTAIN"],
+  "visualClues": ["specific things that led to this guess"],
+  "sceneDescription": "one sentence of what's happening",
+  "alternatives": [
+    {"title": "other possible show", "confidence": 0.45},
+    {"title": "another possibility", "confidence": 0.3},
+    {"title": "third option", "confidence": 0.2}
+  ],
   "spoilerLevel": "safe",
   "country": "South Korea"
 }
 
-type must be: anime, kdrama, cdrama, movie, tv, unknown
-spoilerLevel: safe (no spoilers), mild (minor), spoiler (major plot event)
-confidence: 0.9+ only if you are very certain`,
+type: anime, kdrama, cdrama, movie, tv, unknown
+spoilerLevel: safe, mild, spoiler`,
                         },
                     ],
                 },
             ],
-            temperature: 0.3,
-            max_tokens: 800,
+            temperature: 0.2,
+            max_tokens: 900,
         }),
     });
 

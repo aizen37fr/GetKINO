@@ -61,8 +61,13 @@ function FrameStrip({ frames }: { frames: string[] }) {
 }
 
 // ─── Result card ─────────────────────────────────────────────────────────────
-function ResultCard({ result, tmdbPoster }: { result: ReelDetectionResult; tmdbPoster?: string }) {
+function ResultCard({ result, tmdbPoster, onSelectAlternative }: {
+    result: ReelDetectionResult;
+    tmdbPoster?: string;
+    onSelectAlternative?: (title: string) => void;
+}) {
     const [showSpoiler, setShowSpoiler] = useState(false);
+    const [wrongOpen, setWrongOpen] = useState(false);
     const tc = TYPE_CONFIG[result.type] ?? TYPE_CONFIG.unknown;
     const sc = SPOILER_CONFIG[result.spoilerLevel];
     const hasSpoilerContent = result.spoilerLevel !== 'safe';
@@ -157,20 +162,60 @@ function ResultCard({ result, tmdbPoster }: { result: ReelDetectionResult; tmdbP
                 </div>
             )}
 
-            {/* Alternatives */}
-            {result.alternatives.length > 0 && (
-                <div className="border-t border-white/5 px-5 py-3">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Other possibilities</p>
-                    <div className="space-y-1">
-                        {result.alternatives.slice(0, 3).map((alt, i) => (
-                            <div key={i} className="flex items-center justify-between">
-                                <span className="text-xs text-gray-400">{alt.title}</span>
-                                <span className="text-xs text-gray-600">{Math.round(alt.confidence * 100)}%</span>
+            {/* ─── Wrong? Section ─── */}
+            <div className="border-t border-white/5">
+                <button onClick={() => setWrongOpen(o => !o)}
+                    className={`w-full flex items-center justify-between px-5 py-3 text-sm transition-colors
+                        ${wrongOpen ? 'bg-orange-500/10 text-orange-300' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
+                    <span className="flex items-center gap-2 font-semibold">
+                        <span>🤔</span>
+                        {wrongOpen ? 'Pick the correct one below' : 'Wrong result? See other possibilities'}
+                    </span>
+                    <span className="text-xs">{wrongOpen ? '▲' : '▼'}</span>
+                </button>
+
+                <AnimatePresence>
+                    {wrongOpen && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                            <div className="px-5 pb-4 space-y-2">
+                                {result.alternatives.length > 0
+                                    ? result.alternatives.slice(0, 3).map((alt, i) => {
+                                        const pct = Math.round(alt.confidence * 100);
+                                        const barColor = pct >= 50 ? 'bg-yellow-500' : 'bg-gray-500';
+                                        return (
+                                            <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: i * 0.07 }}
+                                                onClick={() => onSelectAlternative?.(alt.title)}
+                                                className="group flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-white/3 hover:bg-white/8 hover:border-orange-500/30 cursor-pointer transition-all">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-white group-hover:text-orange-300 transition-colors truncate">
+                                                        {alt.title}
+                                                    </p>
+                                                    <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
+                                                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+                                                            transition={{ delay: i * 0.1 + 0.2, duration: 0.5 }}
+                                                            className={`h-full rounded-full ${barColor}`} />
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs text-gray-500 flex-shrink-0">{pct}%</span>
+                                            </motion.div>
+                                        );
+                                    })
+                                    : (
+                                        <p className="text-sm text-gray-500 text-center py-2">
+                                            No alternatives available. Try uploading a clearer clip.
+                                        </p>
+                                    )
+                                }
+                                <p className="text-[10px] text-gray-600 text-center pt-1">
+                                    💡 Tip: Clips with visible subtitles or title cards give the best results
+                                </p>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
         </motion.div>
     );
 }
