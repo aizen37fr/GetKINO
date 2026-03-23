@@ -13,11 +13,11 @@ import { useAuth } from '../context/AuthContext';
 import type { WatchlistItem, WatchStatus } from '../types/watchlist';
 import { useScanHistory } from '../hooks/useScanHistory';
 import ScanHistoryPanel, { ScanHistoryButton } from '../components/ScanHistoryPanel';
-import { analyzeVideoFrames } from '../services/gemini';
+import { detectFromFrames } from '../services/reelDetector';
 import type { SceneAnalysis } from '../services/gemini';
 import { searchTMDB } from '../services/tmdb-extended';
 
-export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRabbitHole }: { onOpenWatchlist?: () => void; onOpenAI?: () => void; onOpenRabbitHole?: () => void }) {
+export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRabbitHole, onOpenReelDetector }: { onOpenWatchlist?: () => void; onOpenAI?: () => void; onOpenRabbitHole?: () => void; onOpenReelDetector?: () => void }) {
 
     const [image, setImage] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(false);
@@ -104,28 +104,27 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
             // Store thumbnail previews
             setExtractedFrames(frames.map(f => f.dataUrl));
 
-            // Phase 2: Analyze all frames together with Gemini Vision
+            // Phase 2: Analyze all frames with Groq Vision (supports K-drama, anime, movies)
             setVideoPhase('analyzing');
             setVideoProgress(60);
 
-            const framesForGemini = frames.map(f => ({
+            const framesForGroq = frames.map(f => ({
                 data: f.dataUrl.split(',')[1],
                 mimeType: 'image/jpeg',
                 timestamp: f.timestamp,
             }));
 
-            const sceneResult = await analyzeVideoFrames(framesForGemini);
+            const sceneResult = await detectFromFrames(framesForGroq);
             setVideoProgress(80);
 
-            // Phase 3: Build detection result from scene analysis
+            // Phase 3: Build detection result
             setVideoPhase('building');
 
-            if (sceneResult && sceneResult.confidence >= 0.45 && sceneResult.showName !== 'Unknown') {
-                // ✅ Gemini identified the show — use TMDB search to get accurate metadata
-                setSceneAnalysis(sceneResult);
+            if (sceneResult && sceneResult.confidence >= 0.45 && sceneResult.title !== 'Unknown') {
+                // ✅ Groq identified the show — use TMDB to get metadata
                 setVideoProgress(85);
 
-                const tmdbHits = await searchTMDB(sceneResult.showName);
+                const tmdbHits = await searchTMDB(sceneResult.title);
                 if (tmdbHits.length > 0) {
                     const top = tmdbHits[0];
                     const posterUrl = top.posterPath
@@ -134,7 +133,7 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
 
                     const detectionResult: UniversalDetectionResult = {
                         title: top.title,
-                        originalTitle: sceneResult.showName,
+                        originalTitle: sceneResult.title,
                         confidence: sceneResult.confidence,
                         type: top.type === 'movie' ? 'movie' : 'series',
                         year: top.year ? parseInt(top.year) : undefined,
@@ -154,13 +153,12 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
                         addScan(detectionResult, currentImageRef.current ?? undefined, isVideo);
                     }, 500);
                 } else {
-                    // TMDB found nothing — fall back to single-frame scan with hint
+                    // TMDB found nothing — fall back
                     const firstFrameFile = new File([frames[0].blob], 'frame.jpg', { type: 'image/jpeg' });
                     await startScan(firstFrameFile);
                 }
             } else {
-                // Gemini uncertain or returned Unknown — fall back to single-frame detection
-                if (sceneResult) setSceneAnalysis(sceneResult);
+                // Groq uncertain — fall back to single-frame detection
                 const firstFrameFile = new File([frames[0].blob], 'frame.jpg', { type: 'image/jpeg' });
                 await startScan(firstFrameFile);
             }
@@ -333,6 +331,18 @@ export default function CineDetectivePage({ onOpenWatchlist, onOpenAI, onOpenRab
                         >
                             <Compass size={16} />
                             <span className="hidden sm:inline">Rabbit Hole</span>
+                        </motion.button>
+                    )}
+
+                    {onOpenReelDetector && (
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={onOpenReelDetector}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-pink-600/20 to-rose-600/20 border border-pink-500/30 text-pink-300 hover:from-pink-600/30 hover:to-rose-600/30 transition-all text-sm font-semibold shadow-[0_0_15px_rgba(236,72,153,0.15)] hover:shadow-[0_0_25px_rgba(236,72,153,0.3)]"
+                        >
+                            <Video size={16} />
+                            <span className="hidden sm:inline">Reel Detective</span>
                         </motion.button>
                     )}
 

@@ -66,6 +66,7 @@ function AppContent() {
         onOpenWatchlist={() => setCurrentPage('watchlist')}
         onOpenAI={() => setCurrentPage('aiDiscovery')}
         onOpenRabbitHole={() => setCurrentPage('rabbitHole')}
+        onOpenReelDetector={() => setCurrentPage('reelDetector')}
       />
       <AIChatbot />
     </>
