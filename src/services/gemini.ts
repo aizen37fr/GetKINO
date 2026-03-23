@@ -343,7 +343,7 @@ Return ONLY a JSON array:
 // ─── 2. Natural Language Search ───────────────────────────────────────────────
 export interface NLSearchResult {
     title: string;
-    type: 'anime' | 'movie' | 'tv';
+    type: 'anime' | 'movie' | 'tv' | 'kdrama' | 'cdrama' | 'documentary' | 'reality';
     year?: number;
     genres: string[];
     why: string;
@@ -351,12 +351,24 @@ export interface NLSearchResult {
 }
 
 export async function nlSearch(query: string): Promise<NLSearchResult[]> {
-    const prompt = `You are KINO's AI search engine. The user typed: "${query}"
+    const prompt = `You are KINO's universal AI search engine. The user typed: "${query}"
 
-Find 6 REAL anime, movies, or TV shows matching this description/vibe. Only suggest titles that actually exist.
+Search across ALL types of entertainment from EVERY country and era:
+- Anime (Japanese animation)
+- Movies (Hollywood, Bollywood, Korean, French, Spanish, any world cinema)
+- TV Shows (American, British, international)
+- K-Dramas (Korean live-action dramas)
+- C-Dramas (Chinese dramas, wuxia, historical)
+- Turkish / Thai / Japanese dramas
+- Documentaries
+- Reality TV
 
-Return ONLY a JSON array:
-[{"title":"exact title","type":"anime","year":2021,"genres":["Genre1"],"why":"why it matches","emoji":"emoji"}]`;
+Find 6 REAL titles that actually exist and match this vibe/description. Do NOT limit yourself to anime. Prioritize quality matches across all categories.
+
+Return ONLY a JSON array with NO extra text:
+[{"title":"exact title","type":"movie","year":2021,"genres":["Genre1","Genre2"],"why":"why it matches in one sentence","emoji":"relevant emoji"}]
+
+type must be one of: anime, movie, tv, kdrama, cdrama, documentary, reality`;
 
     try {
         return parseJSON<NLSearchResult[]>(await askGemini(prompt)) ?? [];

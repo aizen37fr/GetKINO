@@ -185,11 +185,24 @@ function AISearchTab() {
     }, [query]);
 
     const EXAMPLES = [
-        'dark psychological anime like Death Note',
-        'feel-good romance with great OST',
-        'action movie with plot twists',
-        'cozy slice of life anime',
+        '🌑 dark psychological thriller like Parasite',
+        '💕 romantic K-drama with enemies to lovers',
+        '⛩ action anime with great power system',
+        '🌍 mind-bending sci-fi movie like Inception',
+        '😢 emotional tearjerker that destroys you',
+        '🎭 crime documentary series like Making a Murderer',
+        '🥋 martial arts Chinese drama (wuxia)',
+        '🍵 cozy slice of life with amazing food',
     ];
+
+    const typeLabel = (t: string) => {
+        const map: Record<string, string> = {
+            anime: '⛩ Anime', movie: '🎬 Movie', tv: '📺 TV Show',
+            kdrama: '🇰🇷 K-Drama', cdrama: '🇨🇳 C-Drama',
+            documentary: '🎥 Documentary', reality: '🎪 Reality',
+        };
+        return map[t] ?? t.toUpperCase();
+    };
 
     return (
         <div>
@@ -231,7 +244,7 @@ function AISearchTab() {
             {!loading && results.length > 0 && (
                 <div className="space-y-3 mt-4">
                     {results.map((r, i) => (
-                        <ResultCard key={i} title={r.title} type={r.type}
+                        <ResultCard key={i} title={r.title} type={typeLabel(r.type)}
                             emoji={r.emoji}
                             tag={`${r.year ?? ''} · ${r.genres.slice(0, 2).join(', ')}`}
                             body={r.why}
